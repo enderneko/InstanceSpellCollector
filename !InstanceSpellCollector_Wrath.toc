@@ -1,0 +1,14 @@
+## Interface: 30401
+## Title: |cFFFF3030Instance Spell Collector|r
+## Notes: Collect debuffs and enemy casts
+## Version: r1
+## Author: 篠崎
+## X-Flavor: Wrath
+## SavedVariables: ISC_Config,ISC_Data
+
+## X-Curse-Project-ID: 867852
+
+Libs\LoadLibs_Wrath.xml
+
+Core.lua
+Collector.lua
