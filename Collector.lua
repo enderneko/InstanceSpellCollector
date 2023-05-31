@@ -104,7 +104,7 @@ ISC:RegisterCallback("AddonLoaded", "Collector_AddonLoaded", function()
 end)
 
 -- add & track
-local addBtn = ISC:CreateButton(collectorFrame, "Add Current Instance", "red", {175, 20})
+local addBtn = ISC:CreateButton(collectorFrame, "Add Current Instance", "red", {200, 20})
 addBtn:SetPoint("TOPLEFT", 5, -45)
 addBtn:SetScript("OnClick", function()
     if currentInstanceName and currentInstanceID then
