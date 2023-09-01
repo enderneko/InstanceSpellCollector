@@ -14,6 +14,7 @@ collectorFrame:SetFrameStrata("HIGH")
 collectorFrame:SetMovable(true)
 collectorFrame:SetUserPlaced(true)
 collectorFrame:SetClampedToScreen(true)
+collectorFrame:SetClampRectInsets(300, -300, 0, 300)
 collectorFrame:SetIgnoreParentScale(true)
 tinsert(UISpecialFrames, "InstanceSpellCollectorFrame")
 
@@ -379,7 +380,7 @@ LoadDebuffs = function(debuffs)
                     currentDebuffHighlight:Show()
                     currentDebuffHighlight:SetAllPoints(b)
                     currentDebuffHighlight:SetParent(b)
-                    Export(id..", -- "..debuffs[id])
+                    Export(id..", -- "..debuffs[id].."\n\n"..(GetSpellDescription(id) or ""))
                 end
             end
         end)
@@ -462,7 +463,7 @@ LoadCasts = function(casts)
                     currentCastHighlight:Show()
                     currentCastHighlight:SetAllPoints(b)
                     currentCastHighlight:SetParent(b)
-                    Export(id..", -- "..casts[id])
+                    Export(id..", -- "..casts[id].."\n\n"..(GetSpellDescription(id) or ""))
                 end
             end
         end)
