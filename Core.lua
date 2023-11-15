@@ -45,6 +45,13 @@ function eventFrame:ADDON_LOADED(arg1)
             }
         end
 
+        -- ignore (don't ask again)
+        if type(ISC_Ignore) ~= "table" then
+            ISC_Ignore = {
+                -- [instanceId] = "instanceName",
+            }
+        end
+
         ISC:Fire("AddonLoaded")
     end
 end
@@ -52,6 +59,8 @@ end
 ISC:RegisterCallback("UpdateScale", "Collector_UpdateScale", function()
     P:SetRelativeScale(ISC_Config.scale)
     P:SetEffectiveScale(InstanceSpellCollectorFrame)
+    P:SetEffectiveScale(InstanceSpellCollectorDialog)
+    InstanceSpellCollectorDialog:UpdatePixelPerfect()
     P:SetEffectiveScale(ISCTooltip)
     ISCTooltip:UpdatePixelPerfect()
 end)

@@ -114,7 +114,7 @@ function addon:CreateButton(parent, text, buttonColor, size, noBorder, isSecure,
 
     if parent then b:SetFrameLevel(parent:GetFrameLevel()+1) end
     b:SetText(text)
-    b:SetSize(unpack(size))
+    P:Size(b, size[1], size[2])
     
     local color, hoverColor
     if buttonColor == "red" then

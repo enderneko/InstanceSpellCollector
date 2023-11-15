@@ -2,7 +2,7 @@ local _, ISC = ...
 local P = ISC.pixelPerfectFuncs
 
 local currentInstanceName, currentInstanceID
-local LoadInstances, LoadEnemies, LoadDebuffs, LoadCasts, Export
+local AddCurrentInstance, LoadInstances, LoadEnemies, LoadDebuffs, LoadCasts, Export
 local RegisterEvents, UnregisterEvents
 
 local collectorFrame = CreateFrame("Frame", "InstanceSpellCollectorFrame", UIParent, "BackdropTemplate")
@@ -14,7 +14,7 @@ collectorFrame:SetFrameStrata("HIGH")
 collectorFrame:SetMovable(true)
 collectorFrame:SetUserPlaced(true)
 collectorFrame:SetClampedToScreen(true)
-collectorFrame:SetClampRectInsets(300, -300, 0, 300)
+collectorFrame:SetClampRectInsets(500, -500, 0, 300)
 collectorFrame:SetIgnoreParentScale(true)
 tinsert(UISpecialFrames, "InstanceSpellCollectorFrame")
 
@@ -110,11 +110,7 @@ addBtn:SetPoint("TOPLEFT", 5, -45)
 addBtn:SetScript("OnClick", function()
     if currentInstanceName and currentInstanceID then
         if not ISC_Data["instances"][currentInstanceID] then
-            ISC_Data["instances"][currentInstanceID] = {["name"]=currentInstanceName, ["enabled"]=true}
-            ISC_Data["debuffs"][currentInstanceID] = {}
-            ISC_Data["casts"][currentInstanceID] = {}
-            LoadInstances()
-            collectorFrame:PLAYER_ENTERING_WORLD()
+            AddCurrentInstance()
         end
     end
 end)
@@ -212,11 +208,11 @@ LoadInstances = function()
                 if id == currentInstanceID then
                     if ISC_Data["instances"][id]["enabled"] then
                         statusText:SetText("|cff55ff55TRACKING")
-                        print("|cff77ff00START TRACKING SPELLS!")
+                        print("|cff77ff00[ISC] START TRACKING!")
                         RegisterEvents()
                     else
                         statusText:SetText("")
-                        print("|cffff7700STOP TRACKING SPELLS!")
+                        print("|cffff7700[ISC] STOP TRACKING!")
                         UnregisterEvents()
                     end
                 end
@@ -588,6 +584,60 @@ castTip:SetText("Casts: [spellID spellName]")
 castTip:SetTextColor(0.77, 0.77, 0.77)
 
 -------------------------------------------------
+-- dialog
+-------------------------------------------------
+local dialogTip = "Enable |cFFFF3030ISC|r for current instance?"
+
+local dialog = CreateFrame("Frame", "InstanceSpellCollectorDialog", UIParent, "BackdropTemplate")
+P:Size(dialog, 320, 120)
+dialog:SetPoint("BOTTOM", UIParent, "CENTER")
+dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+dialog:EnableMouse(true)
+dialog:Hide()
+
+local dialogText = dialog:CreateFontString(nil, "OVERLAY", "ISC_FONT_TITLE")
+dialogText:SetPoint("TOP", 0, -10)
+dialogText:SetPoint("LEFT", 10, 0)
+dialogText:SetPoint("RIGHT", -10, 0)
+dialogText:SetSpacing(5)
+dialogText:SetText(dialogTip)
+
+local yesBtn = ISC:CreateButton(dialog, "Yes", "green", {100, 20})
+P:Point(yesBtn, "BOTTOMLEFT", 5, 5)
+yesBtn:SetScript("OnClick", function()
+    AddCurrentInstance()
+    dialog:Hide()
+end)
+
+local noBtn = ISC:CreateButton(dialog, "No", "red", {100, 20})
+P:Point(noBtn, "BOTTOMLEFT", yesBtn, "BOTTOMRIGHT", 5, 0)
+noBtn:SetScript("OnClick", function()
+    dialog:Hide()
+end)
+
+local neverBtn = ISC:CreateButton(dialog, "Never", "red", {100, 20})
+P:Point(neverBtn, "BOTTOMLEFT", noBtn, "BOTTOMRIGHT", 5, 0)
+neverBtn:SetScript("OnClick", function()
+    ISC_Ignore[currentInstanceID] = currentInstanceName
+    dialog:Hide()
+end)
+
+function dialog:UpdatePixelPerfect()
+    dialog:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1})
+    dialog:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
+    dialog:SetBackdropBorderColor(0, 0, 0, 1)
+
+    P:Resize(dialog)
+    P:PixelPerfectPoint(dialog)
+    P:Resize(yesBtn)
+    P:Repoint(yesBtn)
+    P:Resize(noBtn)
+    P:Repoint(noBtn)
+    P:Resize(neverBtn)
+    P:Repoint(neverBtn)
+end
+
+-------------------------------------------------
 -- functions
 -------------------------------------------------
 -- https://wowpedia.fandom.com/wiki/UnitFlag
@@ -605,6 +655,15 @@ end
 local function IsEnemy(unitFlags)
     if not unitFlags then return false end
     return (bit.band(unitFlags, OBJECT_REACTION_HOSTILE) ~= 0) or (bit.band(unitFlags, OBJECT_REACTION_NEUTRAL) ~= 0)
+end
+
+AddCurrentInstance = function()
+    ISC_Data["instances"][currentInstanceID] = {["name"]=currentInstanceName, ["enabled"]=true}
+    ISC_Data["debuffs"][currentInstanceID] = {}
+    ISC_Data["casts"][currentInstanceID] = {}
+    ISC_Ignore[currentInstanceID] = nil
+    LoadInstances()
+    collectorFrame:PLAYER_ENTERING_WORLD()
 end
 
 -------------------------------------------------
@@ -634,11 +693,18 @@ function collectorFrame:PLAYER_ENTERING_WORLD()
         instanceIDText:SetText("ID: |cffff5500"..instanceID)
         instanceNameText:SetText("Name: |cffff5500"..name)
         currentInstanceName, currentInstanceID = name, instanceID
-        if ISC_Data["instances"][currentInstanceID] and ISC_Data["instances"][currentInstanceID]["enabled"] then
+        
+        if ISC_Data["instances"][instanceID] and ISC_Data["instances"][instanceID]["enabled"] then
             statusText:SetText("|cff55ff55TRACKING")
-            print("|cff77ff00START TRACKING SPELLS!")
+            print("|cff77ff00[ISC] START TRACKING!")
             RegisterEvents()
+        
         else
+            if not ISC_Data["instances"][instanceID] and not ISC_Ignore[instanceID] and (instanceType == "raid" or instanceType == "party") then
+                dialogText:SetText(dialogTip.."\n|cFFFFD100"..instanceID.."\n"..name)
+                dialog:Show()
+            end
+
             statusText:SetText("")
             UnregisterEvents()
         end
