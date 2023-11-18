@@ -595,6 +595,10 @@ dialog:SetFrameStrata("FULLSCREEN_DIALOG")
 dialog:EnableMouse(true)
 dialog:Hide()
 
+dialog:SetScript("OnShow", function()
+    P:PixelPerfectPoint(dialog)
+end)
+
 local dialogText = dialog:CreateFontString(nil, "OVERLAY", "ISC_FONT_TITLE")
 dialogText:SetPoint("TOP", 0, -10)
 dialogText:SetPoint("LEFT", 10, 0)
@@ -623,18 +627,14 @@ neverBtn:SetScript("OnClick", function()
 end)
 
 function dialog:UpdatePixelPerfect()
-    dialog:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1})
+    dialog:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = P:Scale(1)})
     dialog:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
     dialog:SetBackdropBorderColor(0, 0, 0, 1)
 
-    P:Resize(dialog)
-    P:PixelPerfectPoint(dialog)
-    P:Resize(yesBtn)
-    P:Repoint(yesBtn)
-    P:Resize(noBtn)
-    P:Repoint(noBtn)
-    P:Resize(neverBtn)
-    P:Repoint(neverBtn)
+    dialog:SetSize(P:Scale(100)*3+P:Scale(5)*4, 120)
+    yesBtn:UpdatePixelPerfect()
+    noBtn:UpdatePixelPerfect()
+    neverBtn:UpdatePixelPerfect()
 end
 
 -------------------------------------------------

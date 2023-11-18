@@ -268,6 +268,25 @@ function addon:CreateButton(parent, text, buttonColor, size, noBorder, isSecure,
 
     SetTooltip(b, "ANCHOR_TOPLEFT", 0, 3, ...)
 
+    function b:UpdatePixelPerfect()
+        P:Resize(b)
+        P:Repoint(b)
+
+        if not noBorder then
+            -- backup colors
+            local currentBackdropColor = {b:GetBackdropColor()}
+            local currentBackdropBorderColor = {b:GetBackdropBorderColor()}
+            -- update backdrop
+            local n = P:Scale(1)
+            b:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = n, insets = {left=n, right=n, top=n, bottom=n}})
+            -- restore colors
+            b:SetBackdropColor(unpack(currentBackdropColor))
+            b:SetBackdropBorderColor(unpack(currentBackdropBorderColor))
+            currentBackdropColor = nil
+            currentBackdropBorderColor = nil
+        end
+    end
+
     return b
 end
 
