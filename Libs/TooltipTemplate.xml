@@ -201,4 +201,28 @@
             </Layer>
         </Layers>
     </GameTooltip>
+    <GameTooltip name="ISCAuraDescTooltipTemplate" frameStrata="TOOLTIP" clampedToScreen="true" hidden="true" virtual="true">
+        <Layers>
+            <Layer level="ARTWORK">
+                <FontString name="$parentTextLeft1" justifyH="LEFT" inherits="ISC_FONT_NORMAL" hidden="true">
+                    <Anchors>
+                        <Anchor point="TOPLEFT">
+                            <Offset>
+                                <AbsDimension x="10" y="-10"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+                <FontString name="$parentTextRight1" justifyH="RIGHT" inherits="ISC_FONT_NORMAL" hidden="true">
+                    <Anchors>
+                        <Anchor point="RIGHT" relativeTo="$parentTextLeft1" relativePoint="LEFT">
+                            <Offset>
+                                <AbsDimension x="40" y="0"/>
+                            </Offset>
+                        </Anchor>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+    </GameTooltip>
 </Ui>

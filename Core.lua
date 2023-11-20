@@ -1,5 +1,9 @@
 local addonName, ISC = ...
 local P = ISC.pixelPerfectFuncs
+
+ISC.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+ISC.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
+ISC.isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
  
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
@@ -42,6 +46,13 @@ function eventFrame:ADDON_LOADED(arg1)
                 ["casts"] = {
                     -- [sourceName] = {spellId=spellname}
                 }
+            }
+        end
+
+        -- aura descriptions
+        if type(ISC_AuraDesc) ~= "table" then
+            ISC_AuraDesc = {
+                -- [auraId] = "auraDescription"
             }
         end
 

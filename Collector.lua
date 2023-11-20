@@ -2,6 +2,7 @@ local _, ISC = ...
 local P = ISC.pixelPerfectFuncs
 
 local currentInstanceName, currentInstanceID
+local currentEncounterID, currentEncounterName = "* ", nil
 local AddCurrentInstance, LoadInstances, LoadEnemies, LoadDebuffs, LoadCasts, Export
 local RegisterEvents, UnregisterEvents
 
@@ -16,7 +17,7 @@ collectorFrame:SetUserPlaced(true)
 collectorFrame:SetClampedToScreen(true)
 collectorFrame:SetClampRectInsets(500, -500, 0, 300)
 collectorFrame:SetIgnoreParentScale(true)
-tinsert(UISpecialFrames, "InstanceSpellCollectorFrame")
+-- tinsert(UISpecialFrames, "InstanceSpellCollectorFrame")
 
 collectorFrame:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1})
 collectorFrame:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
@@ -376,7 +377,20 @@ LoadDebuffs = function(debuffs)
                     currentDebuffHighlight:Show()
                     currentDebuffHighlight:SetAllPoints(b)
                     currentDebuffHighlight:SetParent(b)
-                    Export(id..", -- "..debuffs[id].."\n\n"..(GetSpellDescription(id) or ""))
+
+                    local str = id..", -- "..debuffs[id]
+                    
+                    local spellDesc = GetSpellDescription(id)
+                    if spellDesc then
+                        str = str.."\n\n"..spellDesc
+                    end
+
+                    local auraDesc = ISC_AuraDesc[id]
+                    if auraDesc then
+                        str = str.."\n\n"..auraDesc
+                    end
+
+                    Export(str)
                 end
             end
         end)
@@ -386,6 +400,7 @@ LoadDebuffs = function(debuffs)
             ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
             ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
             ISCTooltip:SetSpellByID(id)
+            ISCTooltip:SetAuraDesc(ISC_AuraDesc[id])
             ISCTooltip:Show()
         end)
 
@@ -666,6 +681,71 @@ AddCurrentInstance = function()
     collectorFrame:PLAYER_ENTERING_WORLD()
 end
 
+local queue = {}
+
+local function GetAuraIndex(unit, id)
+    local index = 1
+    local auraIndex
+    AuraUtil.ForEachAura(unit, "HARMFUL", nil, function(name, icon, count, debuffType, duration, expirationTime, source, isStealable, nameplateShowPersonal, spellId)
+        if spellId == id then
+            auraIndex = index
+        end
+        index = index + 1
+    end)
+    return auraIndex
+end
+
+local function GetAuraDesc(unit, id)
+    local index = GetAuraIndex(unit, id)
+
+    if index then
+        local data = C_TooltipInfo.GetUnitDebuff(unit, index)
+
+        queue[data.dataInstanceID] = {
+            unit,
+            id,
+        }
+        
+        if data["lines"] and data["lines"][2] then
+            -- print("GET", id, data["lines"][2]["leftText"])
+            return data["lines"][2]["leftText"]
+        end
+    end
+end
+
+local function Save(index, sourceName, spellId, spellName, destGUID)
+    -- save enemy-spell
+    sourceName = currentEncounterID..sourceName
+    if type(ISC_Data[index][currentInstanceID][sourceName]) ~= "table" then
+        ISC_Data[index][currentInstanceID][sourceName] = {}
+    end
+    ISC_Data[index][currentInstanceID][sourceName][spellId] = spellName
+
+    if currentEncounterID and currentEncounterName then
+        -- save encounter-spell
+        local currentEncounter = "|cff27ffff"..currentEncounterID..currentEncounterName
+        if type(ISC_Data[index][currentInstanceID][currentEncounter]) ~= "table" then
+            ISC_Data[index][currentInstanceID][currentEncounter] = {}
+        end
+        ISC_Data[index][currentInstanceID][currentEncounter][spellId] = spellName
+    else
+        -- save mobs-spell
+        local mobs = "|cff27ffff* MOBS"
+        if type(ISC_Data[index][currentInstanceID][mobs]) ~= "table" then
+            ISC_Data[index][currentInstanceID][mobs] = {}
+        end
+        ISC_Data[index][currentInstanceID][mobs][spellId] = spellName
+    end
+
+    -- save aura description
+    if ISC.isRetail and index == "debuffs" and not ISC_AuraDesc[spellId] then
+        local unit = UnitTokenFromGUID(destGUID)
+        if unit then
+            ISC_AuraDesc[spellId] = GetAuraDesc(unit, spellId)
+        end
+    end
+end
+
 -------------------------------------------------
 -- event
 -------------------------------------------------
@@ -677,6 +757,7 @@ RegisterEvents = function()
     collectorFrame:RegisterEvent("ENCOUNTER_END")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    if ISC.isRetail then collectorFrame:RegisterEvent("TOOLTIP_DATA_UPDATE") end
 end
 
 UnregisterEvents = function()
@@ -685,6 +766,7 @@ UnregisterEvents = function()
     collectorFrame:UnregisterEvent("ENCOUNTER_END")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    if ISC.isRetail then collectorFrame:UnregisterEvent("TOOLTIP_DATA_UPDATE") end
 end
 
 function collectorFrame:PLAYER_ENTERING_WORLD()
@@ -714,10 +796,26 @@ function collectorFrame:PLAYER_ENTERING_WORLD()
         instanceIDText:SetText("ID:")
         statusText:SetText("")
         UnregisterEvents()
+        wipe(queue)
     end
 end
 
-local currentEncounterID, currentEncounterName = "* ", nil
+function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
+    if queue[dataInstanceID] then
+        local unit, id = queue[dataInstanceID][1], queue[dataInstanceID][2]
+        queue[dataInstanceID] = nil
+
+        local index = GetAuraIndex(unit, id)
+        if index then
+            local data = C_TooltipInfo.GetUnitDebuff(unit, index)
+            if data["lines"] and data["lines"][2] then
+                -- print("UPDATE", id, data["lines"][2]["leftText"])
+                ISC_AuraDesc[id] = data["lines"][2]["leftText"]
+            end
+        end
+    end
+end
+
 function collectorFrame:ENCOUNTER_START(encounterID, encounterName)
     currentEncounterID = encounterID.." "
     currentEncounterName = encounterName
@@ -726,31 +824,6 @@ end
 function collectorFrame:ENCOUNTER_END()
     currentEncounterID = "* "
     currentEncounterName = nil
-end
-
-local function Save(index, sourceName, spellId, spellName)
-    -- save enemy-spell
-    sourceName = currentEncounterID..sourceName
-    if type(ISC_Data[index][currentInstanceID][sourceName]) ~= "table" then
-        ISC_Data[index][currentInstanceID][sourceName] = {}
-    end
-    ISC_Data[index][currentInstanceID][sourceName][spellId] = spellName
-
-    if currentEncounterID and currentEncounterName then
-        -- save encounter-spell
-        local currentEncounter = "|cff27ffff"..currentEncounterID..currentEncounterName
-        if type(ISC_Data[index][currentInstanceID][currentEncounter]) ~= "table" then
-            ISC_Data[index][currentInstanceID][currentEncounter] = {}
-        end
-        ISC_Data[index][currentInstanceID][currentEncounter][spellId] = spellName
-    else
-        -- save mobs-spell
-        local mobs = "|cff27ffff* MOBS"
-        if type(ISC_Data[index][currentInstanceID][mobs]) ~= "table" then
-            ISC_Data[index][currentInstanceID][mobs] = {}
-        end
-        ISC_Data[index][currentInstanceID][mobs][spellId] = spellName
-    end
 end
 
 --! CASTS
@@ -779,7 +852,7 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
     if (IsEnemy(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
         if not sourceName then sourceName = "UNKNOWN" end
-        Save("debuffs", sourceName, spellId, spellName)
+        Save("debuffs", sourceName, spellId, spellName, destGUID)
     end
 end
 
