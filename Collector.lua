@@ -193,7 +193,7 @@ LoadInstances = function()
                     currentInstanceHighlight:Show()
                     currentInstanceHighlight:SetAllPoints(b)
                     currentInstanceHighlight:SetParent(b)
-                    LoadEnemies(ISC_Data["debuffs"][id], ISC_Data["casts"][id])
+                    LoadEnemies(ISC_Data["debuffs"][id], ISC_Data["casts"][id], id)
                 end
                 LoadDebuffs()
                 LoadCasts()
@@ -239,7 +239,7 @@ ISC:StylizeFrame(currentEnemyHighlight, {0,0,0,0}, {0.2, 1, 0.2})
 
 local sortedEnemies = {}
 local enemyButtons = {}
-LoadEnemies = function(debuffs, casts)
+LoadEnemies = function(debuffs, casts, instanceID)
     wipe(enemyButtons)
     wipe(sortedEnemies)
     enemyListFrame.scrollFrame:Reset()
@@ -309,6 +309,23 @@ LoadEnemies = function(debuffs, casts)
                 LoadCasts(casts[enemy])
             end
             Export(debuffs[enemy], casts[enemy])
+        end)
+
+         -- tooltip
+         b:HookScript("OnEnter", function()
+            local name = string.gsub(enemy, "* ", "")
+            name = string.gsub(name, "%d+ ", "")
+
+            if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
+                ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
+                ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
+                ISCTooltip:AddLine(ISC_NpcId[instanceID][name])
+                ISCTooltip:Show()
+            end
+        end)
+
+        b:HookScript("OnLeave", function()
+            ISCTooltip:Hide()
         end)
     end
 
@@ -400,7 +417,7 @@ LoadDebuffs = function(debuffs)
             ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
             ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
             ISCTooltip:SetSpellByID(id)
-            ISCTooltip:SetAuraDesc(ISC_AuraDesc[id])
+            ISCTooltip:SetExtraTip(ISC_AuraDesc[id])
             ISCTooltip:Show()
         end)
 
@@ -676,6 +693,7 @@ AddCurrentInstance = function()
     ISC_Data["instances"][currentInstanceID] = {["name"]=currentInstanceName, ["enabled"]=true}
     ISC_Data["debuffs"][currentInstanceID] = {}
     ISC_Data["casts"][currentInstanceID] = {}
+    ISC_NpcId[currentInstanceID] = {}
     ISC_Ignore[currentInstanceID] = nil
     LoadInstances()
     collectorFrame:PLAYER_ENTERING_WORLD()
@@ -713,7 +731,13 @@ local function GetAuraDesc(unit, id)
     end
 end
 
-local function Save(index, sourceName, spellId, spellName, destGUID)
+local function Save(index, sourceName, spellId, spellName, destGUID, sourceGUID)
+    -- save npcid
+    if not ISC_NpcId[currentInstanceID][sourceName] then
+        -- local _, _, server_id, instance_id, zone_uid, npc_id, spawn_uid = strsplit("-", sourceGUID)
+        ISC_NpcId[currentInstanceID][sourceName] = select(6, strsplit("-", sourceGUID))
+    end
+
     -- save enemy-spell
     sourceName = currentEncounterID..sourceName
     if type(ISC_Data[index][currentInstanceID][sourceName]) ~= "table" then
@@ -829,13 +853,13 @@ end
 --! CASTS
 function collectorFrame:UNIT_SPELLCAST_START(unit, _, spellId)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
-    if not UnitIsEnemy("player", unit) then return end
+    if UnitIsFriend("player", unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
     
     local sourceName = UnitName(unit)
     if not sourceName then return end
 
-    Save("casts", sourceName, spellId, GetSpellInfo(spellId))
+    Save("casts", sourceName, spellId, GetSpellInfo(spellId), nil, UnitGUID(unit))
 end
 
 function collectorFrame:UNIT_SPELLCAST_CHANNEL_START(unit, _, spellId)
@@ -852,7 +876,7 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
     if (IsEnemy(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
         if not sourceName then sourceName = "UNKNOWN" end
-        Save("debuffs", sourceName, spellId, spellName, destGUID)
+        Save("debuffs", sourceName, spellId, spellName, destGUID, sourceGUID)
     end
 end
 

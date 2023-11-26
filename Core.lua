@@ -41,10 +41,14 @@ function eventFrame:ADDON_LOADED(arg1)
                     -- [id] = {name=string, enabled=boolean}
                 },
                 ["debuffs"] = {
-                    -- [sourceName] = {spellId=spellname}
+                    -- [instanceId] = {
+                    --     [sourceName] = {spellId=spellname}
+                    -- }
                 },
                 ["casts"] = {
-                    -- [sourceName] = {spellId=spellname}
+                    -- [instanceId] = {
+                    --     [sourceName] = {spellId=spellname}
+                    -- }
                 }
             }
         end
@@ -53,6 +57,15 @@ function eventFrame:ADDON_LOADED(arg1)
         if type(ISC_AuraDesc) ~= "table" then
             ISC_AuraDesc = {
                 -- [auraId] = "auraDescription"
+            }
+        end
+
+        -- npc id
+        if type(ISC_NpcId) ~= "table" then
+            ISC_NpcId = {
+                -- [instanceId] = {
+                --     [name] = id
+                -- }
             }
         end
 

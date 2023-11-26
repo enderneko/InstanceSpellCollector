@@ -201,7 +201,7 @@
             </Layer>
         </Layers>
     </GameTooltip>
-    <GameTooltip name="ISCAuraDescTooltipTemplate" frameStrata="TOOLTIP" clampedToScreen="true" hidden="true" virtual="true">
+    <GameTooltip name="ISCExtraTooltipTemplate" frameStrata="TOOLTIP" clampedToScreen="true" hidden="true" virtual="true">
         <Layers>
             <Layer level="ARTWORK">
                 <FontString name="$parentTextLeft1" justifyH="LEFT" inherits="ISC_FONT_NORMAL" hidden="true">

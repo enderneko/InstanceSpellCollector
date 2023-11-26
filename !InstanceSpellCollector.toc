@@ -1,10 +1,10 @@
 ## Interface: 100200
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r4
+## Version: r5
 ## Author: enderneko
 ## X-Flavor: Mainline
-## SavedVariables: ISC_Config,ISC_Data,ISC_AuraDesc,ISC_Ignore
+## SavedVariables: ISC_Config,ISC_Data,ISC_AuraDesc,ISC_NpcId,ISC_Ignore
 ## AddonCompartmentFunc: ISC_OnAddonCompartmentClick
 ## IconTexture: interface/icons/inv_sigil_ulduarall.blp
 
