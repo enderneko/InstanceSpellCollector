@@ -184,6 +184,7 @@ LoadInstances = function()
                     ISC_Data["instances"][id] = nil
                     ISC_Data["debuffs"][id] = nil
                     ISC_Data["casts"][id] = nil
+                    ISC_NpcId[id] = nil
                     LoadInstances()
                     if selectedInstance == id then
                         LoadEnemies()

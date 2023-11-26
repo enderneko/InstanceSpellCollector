@@ -69,6 +69,11 @@ function eventFrame:ADDON_LOADED(arg1)
             }
         end
 
+        -- fix
+        for id in pairs(ISC_Data["instances"]) do
+            if not ISC_NpcId[id] then ISC_NpcId[id] = {} end
+        end
+
         -- ignore (don't ask again)
         if type(ISC_Ignore) ~= "table" then
             ISC_Ignore = {
