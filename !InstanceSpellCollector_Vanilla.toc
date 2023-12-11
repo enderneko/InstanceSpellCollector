@@ -1,9 +1,9 @@
-## Interface: 30403
+## Interface: 11500
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
 ## Version: r7
 ## Author: enderneko
-## X-Flavor: Wrath
+## X-Flavor: Vanilla
 ## SavedVariables: ISC_Config,ISC_Data,ISC_NpcId,ISC_Ignore
 
 ## X-Curse-Project-ID: 867852
