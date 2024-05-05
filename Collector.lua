@@ -626,6 +626,7 @@ P:Size(dialog, 320, 120)
 dialog:SetPoint("BOTTOM", UIParent, "CENTER")
 dialog:SetFrameStrata("FULLSCREEN_DIALOG")
 dialog:EnableMouse(true)
+dialog:SetIgnoreParentScale(true)
 dialog:Hide()
 
 dialog:SetScript("OnShow", function()
@@ -673,6 +674,13 @@ end
 -------------------------------------------------
 -- functions
 -------------------------------------------------
+local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo.GetUnitDebuff
+local UnitIsFriend = UnitIsFriend
+local UnitName = UnitName
+local UnitGUID = UnitGUID
+local GetSpellInfo = GetSpellInfo
+local IsInInstance = IsInInstance
+
 -- https://wowpedia.fandom.com/wiki/UnitFlag
 local OBJECT_AFFILIATION_MINE = 0x00000001
 local OBJECT_AFFILIATION_PARTY = 0x00000002
@@ -718,7 +726,7 @@ local function GetAuraDesc(unit, id)
     local index = GetAuraIndex(unit, id)
 
     if index then
-        local data = C_TooltipInfo.GetUnitDebuff(unit, index)
+        local data = C_TooltipInfo_GetUnitDebuff(unit, index)
 
         queue[data.dataInstanceID] = {
             unit,
@@ -780,18 +788,28 @@ RegisterEvents = function()
     collectorFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     collectorFrame:RegisterEvent("ENCOUNTER_START")
     collectorFrame:RegisterEvent("ENCOUNTER_END")
-    collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
-    collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
-    if ISC.isRetail then collectorFrame:RegisterEvent("TOOLTIP_DATA_UPDATE") end
+    collectorFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    collectorFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
+    -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    if ISC.isRetail then
+        collectorFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
+        collectorFrame:RegisterEvent("UNIT_AURA")
+    end
 end
 
 UnregisterEvents = function()
     collectorFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
     collectorFrame:UnregisterEvent("ENCOUNTER_START")
     collectorFrame:UnregisterEvent("ENCOUNTER_END")
-    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
-    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
-    if ISC.isRetail then collectorFrame:UnregisterEvent("TOOLTIP_DATA_UPDATE") end
+    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
+    -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    if ISC.isRetail then
+        collectorFrame:UnregisterEvent("TOOLTIP_DATA_UPDATE")
+        collectorFrame:UnregisterEvent("UNIT_AURA")
+    end
 end
 
 function collectorFrame:PLAYER_ENTERING_WORLD()
@@ -832,7 +850,7 @@ function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
 
         local index = GetAuraIndex(unit, id)
         if index then
-            local data = C_TooltipInfo.GetUnitDebuff(unit, index)
+            local data = C_TooltipInfo_GetUnitDebuff(unit, index)
             if data["lines"] and data["lines"][2] then
                 -- print("UPDATE", id, data["lines"][2]["leftText"])
                 ISC_AuraDesc[id] = data["lines"][2]["leftText"]
@@ -852,7 +870,7 @@ function collectorFrame:ENCOUNTER_END()
 end
 
 --! CASTS
-function collectorFrame:UNIT_SPELLCAST_START(unit, _, spellId)
+function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
     if UnitIsFriend("player", unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
@@ -863,8 +881,8 @@ function collectorFrame:UNIT_SPELLCAST_START(unit, _, spellId)
     Save("casts", sourceName, spellId, GetSpellInfo(spellId), nil, UnitGUID(unit))
 end
 
-function collectorFrame:UNIT_SPELLCAST_CHANNEL_START(unit, _, spellId)
-    collectorFrame:UNIT_SPELLCAST_START(unit, _, spellId)
+function collectorFrame:UNIT_SPELLCAST_INTERRUPTED(unit, _, spellId)
+    collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
 end
 
 --! DEBUFFS
@@ -873,11 +891,26 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     if event ~= "SPELL_AURA_APPLIED" or auraType ~= "DEBUFF" then return end
 
     if not (currentInstanceName and currentInstanceID and spellId) then return end
+    if spellId == 1604 then return end -- 眩晕下坐骑
 
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
     if (IsEnemy(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
         if not sourceName then sourceName = "UNKNOWN" end
         Save("debuffs", sourceName, spellId, spellName, destGUID, sourceGUID)
+    end
+end
+
+--! DEBUFFS (UNIT_AURA)
+if ISC.isRetail then
+    function collectorFrame:UNIT_AURA(unit, updateInfo)
+        if updateInfo and updateInfo.addedAuras then
+            for _, data in pairs(updateInfo.addedAuras) do
+                if data.isHarmful and data.sourceUnit and not UnitIsFriend("player", data.sourceUnit) then
+                    local sourceName = UnitName(data.sourceUnit)
+                    Save("debuffs", sourceName or "UNKNOWN", data.spellId, data.name, UnitGUID(unit), UnitGUID(data.sourceUnit))
+                end
+            end
+        end
     end
 end
 
