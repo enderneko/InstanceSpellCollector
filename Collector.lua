@@ -320,7 +320,7 @@ LoadEnemies = function(debuffs, casts, instanceID)
             if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
                 ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
                 ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
-                ISCTooltip:AddLine(ISC_NpcId[instanceID][name])
+                ISCTooltip:AddLine("npcID: ".."|cffffffff"..ISC_NpcId[instanceID][name])
                 ISCTooltip:Show()
             end
         end)
@@ -680,6 +680,8 @@ local UnitName = UnitName
 local UnitGUID = UnitGUID
 local GetSpellInfo = GetSpellInfo
 local IsInInstance = IsInInstance
+local UnitPlayerOrPetInRaid = UnitPlayerOrPetInRaid
+local UnitPlayerOrPetInParty = UnitPlayerOrPetInParty
 
 -- https://wowpedia.fandom.com/wiki/UnitFlag
 local OBJECT_AFFILIATION_MINE = 0x00000001
@@ -790,6 +792,7 @@ RegisterEvents = function()
     collectorFrame:RegisterEvent("ENCOUNTER_END")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    collectorFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
     -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
     -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
     if ISC.isRetail then
@@ -804,6 +807,7 @@ UnregisterEvents = function()
     collectorFrame:UnregisterEvent("ENCOUNTER_END")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
+    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_FAILED")
     -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
     -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
     if ISC.isRetail then
@@ -860,11 +864,13 @@ function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
 end
 
 function collectorFrame:ENCOUNTER_START(encounterID, encounterName)
+    print("|cff0077ff[ISC] ENCOUNTER_START|r", encounterID, encounterName)
     currentEncounterID = encounterID.." "
     currentEncounterName = encounterName
 end
 
-function collectorFrame:ENCOUNTER_END()
+function collectorFrame:ENCOUNTER_END(encounterID, encounterName)
+    print("|cff0077ff[ISC] ENCOUNTER_END|r", encounterID, encounterName)
     currentEncounterID = "* "
     currentEncounterName = nil
 end
@@ -882,6 +888,10 @@ function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
 end
 
 function collectorFrame:UNIT_SPELLCAST_INTERRUPTED(unit, _, spellId)
+    collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
+end
+
+function collectorFrame:UNIT_SPELLCAST_FAILED(unit, _, spellId)
     collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
 end
 
@@ -903,9 +913,12 @@ end
 --! DEBUFFS (UNIT_AURA)
 if ISC.isRetail then
     function collectorFrame:UNIT_AURA(unit, updateInfo)
-        if updateInfo and updateInfo.addedAuras then
+        if not (currentInstanceName and currentInstanceID and updateInfo) then return end
+        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit)) then return end
+
+        if updateInfo.addedAuras then
             for _, data in pairs(updateInfo.addedAuras) do
-                if data.isHarmful and data.sourceUnit and not UnitIsFriend("player", data.sourceUnit) then
+                if data.isHarmful and data.spellId ~= 1604 and data.sourceUnit and not UnitIsFriend("player", data.sourceUnit) then
                     local sourceName = UnitName(data.sourceUnit)
                     Save("debuffs", sourceName or "UNKNOWN", data.spellId, data.name, UnitGUID(unit), UnitGUID(data.sourceUnit))
                 end

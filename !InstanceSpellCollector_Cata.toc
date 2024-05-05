@@ -1,7 +1,7 @@
 ## Interface: 40400
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r8
+## Version: r9
 ## Author: enderneko
 ## X-Flavor: Cata
 ## SavedVariables: ISC_Config,ISC_Data,ISC_NpcId,ISC_Ignore
