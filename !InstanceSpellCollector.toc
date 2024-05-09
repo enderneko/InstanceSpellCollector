@@ -1,7 +1,7 @@
-## Interface: 100206
+## Interface: 100207
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r9
+## Version: r10
 ## Author: enderneko
 ## X-Flavor: Mainline
 ## SavedVariables: ISC_Config,ISC_Data,ISC_AuraDesc,ISC_NpcId,ISC_Ignore

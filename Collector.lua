@@ -462,8 +462,15 @@ LoadCasts = function(casts)
 
     local last
     for _, id in ipairs(sortedCasts) do
-        local icon = select(3, GetSpellInfo(id))
-        local b = ISC:CreateButton(castListFrame.scrollFrame.content, "|T"..icon..":16:16:0:0:16:16|t "..id.." "..casts[id], "red-hover", {20, 20}, true)
+        local icon, castTime = select(3, GetSpellInfo(id))
+
+        if castTime == 0 then
+            castTime = "|cffffdd22"
+        else
+            castTime = ""
+        end
+
+        local b = ISC:CreateButton(castListFrame.scrollFrame.content, "|T"..icon..":16:16:0:0:16:16|t "..castTime..id.." "..casts[id], "red-hover", {20, 20}, true)
         tinsert(castButtons, b)
 
         b:GetFontString():ClearAllPoints()

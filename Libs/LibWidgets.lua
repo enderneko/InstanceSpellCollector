@@ -383,7 +383,7 @@ function addon:CreateEditBox(parent, width, height, isTransparent, isMultiLine, 
     eb:SetMultiLine(isMultiLine)
     eb:SetMaxLetters(0)
     eb:SetJustifyH("LEFT")
-    eb:SetJustifyV("CENTER")
+    eb:SetJustifyV("MIDDLE")
     eb:SetWidth(width or 0)
     eb:SetHeight(height or 0)
     eb:SetTextInsets(5, 5, 0, 0)
