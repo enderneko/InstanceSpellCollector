@@ -470,7 +470,13 @@ LoadCasts = function(casts)
             castTime = ""
         end
 
-        local b = ISC:CreateButton(castListFrame.scrollFrame.content, "|T"..icon..":16:16:0:0:16:16|t "..castTime..id.." "..casts[id], "red-hover", {20, 20}, true)
+        if icon then
+            icon = "|T"..icon..":16:16:0:0:16:16|t "
+        else
+            icon = "|T134400:16:16:0:0:16:16|t "
+        end
+
+        local b = ISC:CreateButton(castListFrame.scrollFrame.content, icon..castTime..id.." "..casts[id], "red-hover", {20, 20}, true)
         tinsert(castButtons, b)
 
         b:GetFontString():ClearAllPoints()
