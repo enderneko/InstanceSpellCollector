@@ -122,6 +122,19 @@ tips:SetPoint("LEFT", addBtn, "RIGHT", 5, 0)
 tips:SetText("[Right-Click] track/untrack, [Ctrl-Click] delete")
 
 -------------------------------------------------
+-- list button
+-------------------------------------------------
+local function CreateListButton(parent)
+    local b = ISC:CreateButton(parent, " ", "red-hover", {20, 20}, true)
+    b:RegisterForClicks("AnyUp")
+    b:GetFontString():ClearAllPoints()
+    b:GetFontString():SetPoint("LEFT", 5, 0)
+    b:GetFontString():SetPoint("RIGHT", -5, 0)
+    b:GetFontString():SetJustifyH("LEFT")
+    return b
+end
+
+-------------------------------------------------
 -- instance list
 -------------------------------------------------
 local instanceListFrame = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
@@ -139,7 +152,6 @@ local instanceButtons = {}
 local selectedInstance
 LoadInstances = function()
     wipe(sotredInstances)
-    wipe(instanceButtons)
     instanceListFrame.scrollFrame:Reset()
 
     for id in pairs(ISC_Data["instances"]) do
@@ -148,18 +160,24 @@ LoadInstances = function()
     table.sort(sotredInstances)
 
     local last
-    for _, id in pairs(sotredInstances) do
-        local b = ISC:CreateButton(instanceListFrame.scrollFrame.content, id.." "..ISC_Data["instances"][id]["name"], "red-hover", {20, 20}, true)
-        tinsert(instanceButtons, b)
-
-        b:GetFontString():ClearAllPoints()
-        b:GetFontString():SetPoint("LEFT", 5, 0)
-        b:GetFontString():SetPoint("RIGHT", -5, 0)
-        b:GetFontString():SetJustifyH("LEFT")
-
-        if not ISC_Data["instances"][id]["enabled"] then
-            b:GetFontString():SetTextColor(0.4, 0.4, 0.4, 1)
+    for i, id in pairs(sotredInstances) do
+        if not instanceButtons[i] then
+            instanceButtons[i] = CreateListButton(instanceListFrame.scrollFrame.content)
+        else
+            instanceButtons[i]:ClearAllPoints()
+            instanceButtons[i]:SetParent(instanceListFrame.scrollFrame.content)
+            instanceButtons[i]:Show()
         end
+
+        local b = instanceButtons[i]
+
+        if ISC_Data["instances"][id]["enabled"] then
+            b:GetFontString():SetTextColor(1, 1, 1)
+        else
+            b:GetFontString():SetTextColor(0.4, 0.4, 0.4)
+        end
+
+        b:SetText(id.." "..ISC_Data["instances"][id]["name"])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -167,10 +185,8 @@ LoadInstances = function()
             b:SetPoint("TOPLEFT", 1, -1)
         end
         b:SetPoint("RIGHT", -1, 0)
-
         last = b
 
-        b:RegisterForClicks("AnyUp")
         b:SetScript("OnClick", function(self, button)
             if button == "LeftButton" then
                 currentInstanceHighlight:Hide()
@@ -222,7 +238,7 @@ LoadInstances = function()
         end)
     end
 
-    instanceListFrame.scrollFrame:SetContentHeight(20, #instanceButtons, -1)
+    instanceListFrame.scrollFrame:SetContentHeight(20, #sotredInstances, -1)
 end
 
 -------------------------------------------------
@@ -241,7 +257,6 @@ ISC:StylizeFrame(currentEnemyHighlight, {0,0,0,0}, {0.2, 1, 0.2})
 local sortedEnemies = {}
 local enemyButtons = {}
 LoadEnemies = function(debuffs, casts, instanceID)
-    wipe(enemyButtons)
     wipe(sortedEnemies)
     enemyListFrame.scrollFrame:Reset()
     currentEnemyHighlight:Hide()
@@ -275,14 +290,36 @@ LoadEnemies = function(debuffs, casts, instanceID)
     end)
 
     local last
-    for _, enemy in ipairs(sortedEnemies) do
-        local b = ISC:CreateButton(enemyListFrame.scrollFrame.content, enemy, "red-hover", {20, 20}, true)
-        tinsert(enemyButtons, b)
+    for i, enemy in ipairs(sortedEnemies) do
+        if not enemyButtons[i] then
+            enemyButtons[i] = CreateListButton(enemyListFrame.scrollFrame.content)
 
-        b:GetFontString():ClearAllPoints()
-        b:GetFontString():SetPoint("LEFT", 5, 0)
-        b:GetFontString():SetPoint("RIGHT", -5, 0)
-        b:GetFontString():SetJustifyH("LEFT")
+             -- tooltip
+             enemyButtons[i]:HookScript("OnEnter", function()
+                local name = string.gsub(enemyButtons[i].enemy, "* ", "")
+                name = string.gsub(name, "%d+ ", "")
+
+                if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
+                    ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
+                    ISCTooltip:SetPoint("TOPLEFT", enemyButtons[i], "TOPRIGHT", 1, 0)
+                    ISCTooltip:AddLine("npcID: ".."|cffffffff"..ISC_NpcId[instanceID][name])
+                    ISCTooltip:Show()
+                end
+            end)
+
+            enemyButtons[i]:HookScript("OnLeave", function()
+                ISCTooltip:Hide()
+            end)
+        else
+            enemyButtons[i]:ClearAllPoints()
+            enemyButtons[i]:SetParent(enemyListFrame.scrollFrame.content)
+            enemyButtons[i]:Show()
+        end
+
+        local b = enemyButtons[i]
+        b.enemy = enemy
+
+        b:SetText(enemy)
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -290,10 +327,8 @@ LoadEnemies = function(debuffs, casts, instanceID)
             b:SetPoint("TOPLEFT", 1, -1)
         end
         b:SetPoint("RIGHT", -1, 0)
-
         last = b
 
-        b:RegisterForClicks("AnyUp")
         b:SetScript("OnClick", function(self, button)
             if IsControlKeyDown() then
                 currentEnemyHighlight:Hide()
@@ -311,26 +346,9 @@ LoadEnemies = function(debuffs, casts, instanceID)
             end
             Export(debuffs[enemy], casts[enemy])
         end)
-
-         -- tooltip
-         b:HookScript("OnEnter", function()
-            local name = string.gsub(enemy, "* ", "")
-            name = string.gsub(name, "%d+ ", "")
-
-            if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
-                ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
-                ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
-                ISCTooltip:AddLine("npcID: ".."|cffffffff"..ISC_NpcId[instanceID][name])
-                ISCTooltip:Show()
-            end
-        end)
-
-        b:HookScript("OnLeave", function()
-            ISCTooltip:Hide()
-        end)
     end
 
-    enemyListFrame.scrollFrame:SetContentHeight(20, #enemyButtons, -1)
+    enemyListFrame.scrollFrame:SetContentHeight(20, #sortedEnemies, -1)
 end
 
 -------------------------------------------------
@@ -349,7 +367,6 @@ ISC:StylizeFrame(currentDebuffHighlight, {0,0,0,0}, {0.2, 1, 0.2})
 local sortedDebuffs = {}
 local debuffButtons = {}
 LoadDebuffs = function(debuffs)
-    wipe(debuffButtons)
     wipe(sortedDebuffs)
     debuffListFrame.scrollFrame:Reset()
     currentDebuffHighlight:Hide()
@@ -364,15 +381,33 @@ LoadDebuffs = function(debuffs)
     table.sort(sortedDebuffs)
 
     local last
-    for _, id in ipairs(sortedDebuffs) do
-        local icon = select(3, GetSpellInfo(id))
-        local b = ISC:CreateButton(debuffListFrame.scrollFrame.content, "|T"..icon..":16:16:0:0:16:16|t "..id.." "..debuffs[id], "red-hover", {20, 20}, true)
-        tinsert(debuffButtons, b)
+    for i, id in ipairs(sortedDebuffs) do
+        if not debuffButtons[i] then
+            debuffButtons[i] = CreateListButton(debuffListFrame.scrollFrame.content)
 
-        b:GetFontString():ClearAllPoints()
-        b:GetFontString():SetPoint("LEFT", 5, 0)
-        b:GetFontString():SetPoint("RIGHT", -5, 0)
-        b:GetFontString():SetJustifyH("LEFT")
+            -- tooltip
+            debuffButtons[i]:HookScript("OnEnter", function()
+                ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
+                ISCTooltip:SetPoint("TOPLEFT", debuffButtons[i], "TOPRIGHT", 1, 0)
+                ISCTooltip:SetSpellByID(debuffButtons[i].id)
+                ISCTooltip:SetExtraTip(ISC_AuraDesc[debuffButtons[i].id])
+                ISCTooltip:Show()
+            end)
+
+            debuffButtons[i]:HookScript("OnLeave", function()
+                ISCTooltip:Hide()
+            end)
+        else
+            debuffButtons[i]:ClearAllPoints()
+            debuffButtons[i]:SetParent(debuffListFrame.scrollFrame.content)
+            debuffButtons[i]:Show()
+        end
+
+        local b = debuffButtons[i]
+        b.id = id
+
+        local icon = select(3, GetSpellInfo(id))
+        b:SetText("|T"..icon..":16:16:0:0:16:16|t "..id.." "..debuffs[id])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -380,10 +415,8 @@ LoadDebuffs = function(debuffs)
             b:SetPoint("TOPLEFT", 1, -1)
         end
         b:SetPoint("RIGHT", -1, 0)
-
         last = b
 
-        b:RegisterForClicks("AnyUp")
         b:SetScript("OnClick", function(self, button)
             if button == "LeftButton" then
                 currentDebuffHighlight:Hide()
@@ -397,7 +430,7 @@ LoadDebuffs = function(debuffs)
                     currentDebuffHighlight:SetParent(b)
 
                     local str = id..", -- "..debuffs[id]
-                    
+
                     local spellDesc = GetSpellDescription(id)
                     if spellDesc then
                         str = str.."\n\n"..spellDesc
@@ -412,22 +445,9 @@ LoadDebuffs = function(debuffs)
                 end
             end
         end)
-
-        -- tooltip
-        b:HookScript("OnEnter", function()
-            ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
-            ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
-            ISCTooltip:SetSpellByID(id)
-            ISCTooltip:SetExtraTip(ISC_AuraDesc[id])
-            ISCTooltip:Show()
-        end)
-
-        b:HookScript("OnLeave", function()
-            ISCTooltip:Hide()
-        end)
     end
 
-    debuffListFrame.scrollFrame:SetContentHeight(20, #debuffButtons, -1)
+    debuffListFrame.scrollFrame:SetContentHeight(20, #sortedDebuffs, -1)
 end
 
 -------------------------------------------------
@@ -447,7 +467,6 @@ local sortedCasts = {}
 local castButtons = {}
 LoadCasts = function(casts)
     wipe(sortedCasts)
-    wipe(castButtons)
     castListFrame.scrollFrame:Reset()
     currentCastHighlight:Hide()
     currentCastHighlight:ClearAllPoints()
@@ -461,14 +480,31 @@ LoadCasts = function(casts)
     table.sort(sortedCasts)
 
     local last
-    for _, id in ipairs(sortedCasts) do
-        local icon, castTime = select(3, GetSpellInfo(id))
+    for i, id in ipairs(sortedCasts) do
+        if not castButtons[i] then
+            castButtons[i] = CreateListButton(castListFrame.scrollFrame.content)
 
-        if castTime == 0 then
-            castTime = "|cffffdd22"
+            -- tooltip
+            castButtons[i]:HookScript("OnEnter", function()
+                ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
+                ISCTooltip:SetPoint("TOPLEFT", castButtons[i], "TOPRIGHT", 1, 0)
+                ISCTooltip:SetSpellByID(castButtons[i].id)
+                ISCTooltip:Show()
+            end)
+
+            castButtons[i]:HookScript("OnLeave", function()
+                ISCTooltip:Hide()
+            end)
         else
-            castTime = ""
+            castButtons[i]:ClearAllPoints()
+            castButtons[i]:SetParent(castListFrame.scrollFrame.content)
+            castButtons[i]:Show()
         end
+
+        local b = castButtons[i]
+        b.id = id
+
+        local icon, castTime = select(3, GetSpellInfo(id))
 
         if icon then
             icon = "|T"..icon..":16:16:0:0:16:16|t "
@@ -476,13 +512,13 @@ LoadCasts = function(casts)
             icon = "|T134400:16:16:0:0:16:16|t "
         end
 
-        local b = ISC:CreateButton(castListFrame.scrollFrame.content, icon..castTime..id.." "..casts[id], "red-hover", {20, 20}, true)
-        tinsert(castButtons, b)
+        if castTime == 0 then
+            b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
+        else
+            b:GetFontString():SetTextColor(1, 1, 1)
+        end
 
-        b:GetFontString():ClearAllPoints()
-        b:GetFontString():SetPoint("LEFT", 5, 0)
-        b:GetFontString():SetPoint("RIGHT", -5, 0)
-        b:GetFontString():SetJustifyH("LEFT")
+        b:SetText(icon..id.." "..casts[id])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -490,10 +526,8 @@ LoadCasts = function(casts)
             b:SetPoint("TOPLEFT", 1, -1)
         end
         b:SetPoint("RIGHT", -1, 0)
-
         last = b
 
-        b:RegisterForClicks("AnyUp")
         b:SetScript("OnClick", function(self, button)
             if button == "LeftButton" then
                 currentCastHighlight:Hide()
@@ -509,21 +543,9 @@ LoadCasts = function(casts)
                 end
             end
         end)
-
-        -- tooltip
-        b:HookScript("OnEnter", function()
-            ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
-            ISCTooltip:SetPoint("TOPLEFT", b, "TOPRIGHT", 1, 0)
-            ISCTooltip:SetSpellByID(id)
-            ISCTooltip:Show()
-        end)
-
-        b:HookScript("OnLeave", function()
-            ISCTooltip:Hide()
-        end)
     end
 
-    castListFrame.scrollFrame:SetContentHeight(20, #castButtons, -1)
+    castListFrame.scrollFrame:SetContentHeight(20, #sortedCasts, -1)
 end
 
 -------------------------------------------------
@@ -687,7 +709,7 @@ end
 -------------------------------------------------
 -- functions
 -------------------------------------------------
-local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo.GetUnitDebuff
+local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo and C_TooltipInfo.GetUnitDebuff
 local UnitIsFriend = UnitIsFriend
 local UnitName = UnitName
 local UnitGUID = UnitGUID
@@ -747,7 +769,7 @@ local function GetAuraDesc(unit, id)
             unit,
             id,
         }
-        
+
         if data["lines"] and data["lines"][2] then
             -- print("GET", id, data["lines"][2]["leftText"])
             return data["lines"][2]["leftText"]
@@ -835,12 +857,12 @@ function collectorFrame:PLAYER_ENTERING_WORLD()
         instanceIDText:SetText("ID: |cffff5500"..instanceID)
         instanceNameText:SetText("Name: |cffff5500"..name)
         currentInstanceName, currentInstanceID = name, instanceID
-        
+
         if ISC_Data["instances"][instanceID] and ISC_Data["instances"][instanceID]["enabled"] then
             statusText:SetText("|cff55ff55TRACKING")
             print("|cff77ff00[ISC] START TRACKING!")
             RegisterEvents()
-        
+
         else
             if not ISC_Data["instances"][instanceID] and not ISC_Ignore[instanceID] and (instanceType == "raid" or instanceType == "party") then
                 dialogText:SetText(dialogTip.."\n|cFFFFD100"..instanceID.."\n"..name)
@@ -893,7 +915,7 @@ function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
     if UnitIsFriend("player", unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
-    
+
     local sourceName = UnitName(unit)
     if not sourceName then return end
 
