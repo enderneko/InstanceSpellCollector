@@ -1,6 +1,30 @@
 local _, ISC = ...
 local P = ISC.pixelPerfectFuncs
 
+local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo and C_TooltipInfo.GetUnitDebuff
+local UnitIsFriend = UnitIsFriend
+local UnitName = UnitName
+local UnitGUID = UnitGUID
+local IsInInstance = IsInInstance
+local UnitPlayerOrPetInRaid = UnitPlayerOrPetInRaid
+local UnitPlayerOrPetInParty = UnitPlayerOrPetInParty
+
+local GetTheSpellInfo
+if C_Spell and C_Spell.GetSpellInfo then
+    GetTheSpellInfo = function(spellid)
+        local info = C_Spell.GetSpellInfo(spellid)
+        return info.name, info.iconID or 134400, info.castTime
+    end
+else
+    GetTheSpellInfo = function(spellid)
+        local name, _, icon, castTime = GetSpellInfo(spellid)
+        return name, icon or 134400, castTime
+    end
+end
+
+---------------------------------------------------------------------
+-- InstanceSpellCollectorFrame
+---------------------------------------------------------------------
 local currentInstanceName, currentInstanceID
 local currentEncounterID, currentEncounterName = "* ", nil
 local AddCurrentInstance, LoadInstances, LoadEnemies, LoadDebuffs, LoadCasts, Export
@@ -406,7 +430,7 @@ LoadDebuffs = function(debuffs)
         local b = debuffButtons[i]
         b.id = id
 
-        local icon = select(3, GetSpellInfo(id))
+        local icon = select(2, GetTheSpellInfo(id))
         b:SetText("|T"..icon..":16:16:0:0:16:16|t "..id.." "..debuffs[id])
 
         if last then
@@ -504,21 +528,14 @@ LoadCasts = function(casts)
         local b = castButtons[i]
         b.id = id
 
-        local icon, castTime = select(3, GetSpellInfo(id))
-
-        if icon then
-            icon = "|T"..icon..":16:16:0:0:16:16|t "
-        else
-            icon = "|T134400:16:16:0:0:16:16|t "
-        end
+        local icon, castTime = select(2, GetTheSpellInfo(id))
+        b:SetText("|T"..icon..":16:16:0:0:16:16|t "..id.." "..casts[id])
 
         if castTime == 0 then
             b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
         else
             b:GetFontString():SetTextColor(1, 1, 1)
         end
-
-        b:SetText(icon..id.." "..casts[id])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -709,15 +726,6 @@ end
 -------------------------------------------------
 -- functions
 -------------------------------------------------
-local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo and C_TooltipInfo.GetUnitDebuff
-local UnitIsFriend = UnitIsFriend
-local UnitName = UnitName
-local UnitGUID = UnitGUID
-local GetSpellInfo = GetSpellInfo
-local IsInInstance = IsInInstance
-local UnitPlayerOrPetInRaid = UnitPlayerOrPetInRaid
-local UnitPlayerOrPetInParty = UnitPlayerOrPetInParty
-
 -- https://wowpedia.fandom.com/wiki/UnitFlag
 local OBJECT_AFFILIATION_MINE = 0x00000001
 local OBJECT_AFFILIATION_PARTY = 0x00000002
@@ -919,7 +927,7 @@ function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
     local sourceName = UnitName(unit)
     if not sourceName then return end
 
-    Save("casts", sourceName, spellId, GetSpellInfo(spellId), nil, UnitGUID(unit))
+    Save("casts", sourceName, spellId, GetTheSpellInfo(spellId), nil, UnitGUID(unit))
 end
 
 function collectorFrame:UNIT_SPELLCAST_INTERRUPTED(unit, _, spellId)
