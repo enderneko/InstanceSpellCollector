@@ -169,7 +169,7 @@ instanceListFrame:SetPoint("BOTTOMRIGHT", collectorFrame, "BOTTOMLEFT", 205, 5)
 ISC:CreateScrollFrame(instanceListFrame)
 local currentInstanceHighlight = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
 currentInstanceHighlight:SetFrameLevel(10)
-ISC:StylizeFrame(currentInstanceHighlight, {0,0,0,0}, {0.2, 1, 0.2})
+ISC:StylizeFrame(currentInstanceHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sotredInstances = {}
 local instanceButtons = {}
@@ -201,7 +201,7 @@ LoadInstances = function()
             b:GetFontString():SetTextColor(0.4, 0.4, 0.4)
         end
 
-        b:SetText(id.." "..ISC_Data["instances"][id]["name"])
+        b:SetText(id .. " " .. ISC_Data["instances"][id]["name"])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -234,7 +234,7 @@ LoadInstances = function()
                     currentInstanceHighlight:Show()
                     currentInstanceHighlight:SetAllPoints(b)
                     currentInstanceHighlight:SetParent(b)
-                    LoadEnemies(ISC_Data["debuffs"][id], ISC_Data["casts"][id], id)
+                    LoadEnemies(id)
                 end
                 LoadDebuffs()
                 LoadCasts()
@@ -276,15 +276,18 @@ enemyListFrame:SetPoint("BOTTOMRIGHT", instanceListFrame, "BOTTOMRIGHT", 205, 0)
 ISC:CreateScrollFrame(enemyListFrame)
 local currentEnemyHighlight = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
 currentEnemyHighlight:SetFrameLevel(10)
-ISC:StylizeFrame(currentEnemyHighlight, {0,0,0,0}, {0.2, 1, 0.2})
+ISC:StylizeFrame(currentEnemyHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedEnemies = {}
 local enemyButtons = {}
-LoadEnemies = function(debuffs, casts, instanceID)
+LoadEnemies = function(instanceID)
     wipe(sortedEnemies)
     enemyListFrame.scrollFrame:Reset()
     currentEnemyHighlight:Hide()
     currentEnemyHighlight:ClearAllPoints()
+
+    local debuffs = ISC_Data["debuffs"][instanceID]
+    local casts = ISC_Data["casts"][instanceID]
 
     if not (debuffs and casts) then return end
 
@@ -318,15 +321,13 @@ LoadEnemies = function(debuffs, casts, instanceID)
         if not enemyButtons[i] then
             enemyButtons[i] = CreateListButton(enemyListFrame.scrollFrame.content)
 
-             -- tooltip
-             enemyButtons[i]:HookScript("OnEnter", function()
-                local name = string.gsub(enemyButtons[i].enemy, "* ", "")
-                name = string.gsub(name, "%d+ ", "")
-
+            -- tooltip
+            enemyButtons[i]:HookScript("OnEnter", function()
+                local name = enemyButtons[i].name
                 if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
                     ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
                     ISCTooltip:SetPoint("TOPLEFT", enemyButtons[i], "TOPRIGHT", 1, 0)
-                    ISCTooltip:AddLine("npcID: ".."|cffffffff"..ISC_NpcId[instanceID][name])
+                    ISCTooltip:AddLine("npcID: " .. "|cffffffff" .. ISC_NpcId[instanceID][name])
                     ISCTooltip:Show()
                 end
             end)
@@ -342,6 +343,8 @@ LoadEnemies = function(debuffs, casts, instanceID)
 
         local b = enemyButtons[i]
         b.enemy = enemy
+        b.name = string.gsub(enemy, "* ", "")
+        b.name = string.gsub(b.name, "^%d+ ", "")
 
         b:SetText(enemy)
 
@@ -358,7 +361,8 @@ LoadEnemies = function(debuffs, casts, instanceID)
                 currentEnemyHighlight:Hide()
                 currentEnemyHighlight:ClearAllPoints()
                 debuffs[enemy] = nil
-                LoadEnemies(debuffs, casts)
+                casts[enemy] = nil
+                LoadEnemies(instanceID)
                 LoadDebuffs()
                 LoadCasts()
             else
@@ -368,7 +372,14 @@ LoadEnemies = function(debuffs, casts, instanceID)
                 LoadDebuffs(debuffs[enemy])
                 LoadCasts(casts[enemy])
             end
-            Export(debuffs[enemy], casts[enemy])
+
+            if strfind(enemy, "^|cff") then
+                Export(enemy.."|r", "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
+            elseif ISC_NpcId[instanceID] and ISC_NpcId[instanceID][b.name] then
+                Export(b.name, "npcID: " .. ISC_NpcId[instanceID][b.name], "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
+            else
+                Export(b.name, "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
+            end
         end)
     end
 
@@ -386,7 +397,7 @@ debuffListFrame:SetPoint("BOTTOMRIGHT", enemyListFrame, "BOTTOMRIGHT", 205, 0)
 ISC:CreateScrollFrame(debuffListFrame)
 local currentDebuffHighlight = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
 currentDebuffHighlight:SetFrameLevel(10)
-ISC:StylizeFrame(currentDebuffHighlight, {0,0,0,0}, {0.2, 1, 0.2})
+ISC:StylizeFrame(currentDebuffHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedDebuffs = {}
 local debuffButtons = {}
@@ -431,7 +442,7 @@ LoadDebuffs = function(debuffs)
         b.id = id
 
         local icon = select(2, GetTheSpellInfo(id))
-        b:SetText("|T"..icon..":16:16:0:0:16:16|t "..id.." "..debuffs[id])
+        b:SetText("|T" .. icon .. ":16:16:0:0:16:16|t " .. id .. " " .. debuffs[id])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -453,16 +464,16 @@ LoadDebuffs = function(debuffs)
                     currentDebuffHighlight:SetAllPoints(b)
                     currentDebuffHighlight:SetParent(b)
 
-                    local str = id..", -- "..debuffs[id]
+                    local str = id .. ", -- " .. debuffs[id]
 
                     local spellDesc = GetSpellDescription(id)
                     if spellDesc then
-                        str = str.."\n\n"..spellDesc
+                        str = str .. "\n\n" .. spellDesc
                     end
 
                     local auraDesc = ISC_AuraDesc[id]
                     if auraDesc then
-                        str = str.."\n\n"..auraDesc
+                        str = str .. "\n\n" .. auraDesc
                     end
 
                     Export(str)
@@ -485,7 +496,7 @@ castListFrame:SetPoint("BOTTOMRIGHT", debuffListFrame, "BOTTOMRIGHT", 205, 0)
 ISC:CreateScrollFrame(castListFrame)
 local currentCastHighlight = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
 currentCastHighlight:SetFrameLevel(10)
-ISC:StylizeFrame(currentCastHighlight, {0,0,0,0}, {0.2, 1, 0.2})
+ISC:StylizeFrame(currentCastHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedCasts = {}
 local castButtons = {}
@@ -529,7 +540,7 @@ LoadCasts = function(casts)
         b.id = id
 
         local icon, castTime = select(2, GetTheSpellInfo(id))
-        b:SetText("|T"..icon..":16:16:0:0:16:16|t "..id.." "..casts[id])
+        b:SetText("|T" .. icon .. ":16:16:0:0:16:16|t " .. id .. " " .. casts[id])
 
         if castTime == 0 then
             b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
@@ -556,7 +567,7 @@ LoadCasts = function(casts)
                     currentCastHighlight:Show()
                     currentCastHighlight:SetAllPoints(b)
                     currentCastHighlight:SetParent(b)
-                    Export(id..", -- "..casts[id].."\n\n"..(GetSpellDescription(id) or ""))
+                    Export(id .. ", -- " .. casts[id] .. "\n\n" .. (GetSpellDescription(id) or ""))
                 end
             end
         end)
@@ -571,12 +582,13 @@ end
 local exportFrame = CreateFrame("Frame", nil, collectorFrame, "BackdropTemplate")
 ISC:StylizeFrame(exportFrame)
 exportFrame:SetPoint("TOPLEFT", castListFrame, "TOPRIGHT", 10, 0)
-exportFrame:SetPoint("BOTTOMRIGHT", castListFrame, "BOTTOMRIGHT", 220, 0)
+exportFrame:SetPoint("BOTTOMRIGHT", castListFrame, "BOTTOMRIGHT", 270, 0)
 exportFrame:Hide()
 
 local exportFrameEditBox = ISC:CreateScrollEditBox(exportFrame)
 exportFrameEditBox:SetPoint("TOPLEFT", 5, -5)
 exportFrameEditBox:SetPoint("BOTTOMRIGHT", -5, 5)
+exportFrameEditBox.eb:SetSpacing(2)
 
 exportFrame:SetScript("OnHide", function()
     exportFrame:Hide()
@@ -589,56 +601,45 @@ exportFrameCloseBtn:SetScript("OnClick", function()
     exportFrame:Hide()
 end)
 
-local function ToString(data1, data2)
+local function ToString(data)
     local sorted = {}
-    local result
+    local result = ""
 
-    if data1 then
-        for id in pairs(data1) do
+    if data then
+        for id in pairs(data) do
             tinsert(sorted, id)
         end
         table.sort(sorted)
 
-        result = "-- debuffs\n"
         for _, id in ipairs(sorted) do
-            result = result..id..", -- "..data1[id].."\n"
-        end
-    end
-
-    if data2 then
-        wipe(sorted)
-        for id in pairs(data2) do
-            tinsert(sorted, id)
-        end
-        table.sort(sorted)
-
-        if result then
-            result = result .. "\n-- casts\n"
-        else
-            result = "-- casts\n"
-        end
-
-        for _, id in ipairs(sorted) do
-            result = result..id..", -- "..data2[id].."\n"
+            result = result .. id .. ", -- " .. data[id] .. "\n"
         end
     end
 
     return result
 end
 
-Export = function(data1, data2)
-    if data1 then
-        exportFrame:Show()
-    else
+Export = function(...)
+    local n = select("#", ...)
+    if n == 0 then
         exportFrame:Hide()
         return
     end
 
-    if type(data1) == "string" then
-        exportFrameEditBox:SetText(data1)
-    else
-        exportFrameEditBox:SetText(ToString(data1, data2))
+    exportFrame:Show()
+
+    local result = ""
+
+    for i = 1, n do
+        local data = select(i, ...)
+        if type(data) == "string" then
+            result = result .. data .. "\n"
+        elseif type(data) == "table" then
+            result = result .. ToString(data) .. "\n"
+        end
     end
+
+    exportFrameEditBox:SetText(result)
 
     C_Timer.After(0.1, function()
         exportFrameEditBox.scrollFrame:SetVerticalScroll(0)
@@ -717,7 +718,7 @@ function dialog:UpdatePixelPerfect()
     dialog:SetBackdropColor(0.05, 0.05, 0.05, 0.9)
     dialog:SetBackdropBorderColor(0, 0, 0, 1)
 
-    dialog:SetSize(P:Scale(100)*3+P:Scale(5)*4, 120)
+    dialog:SetSize(P:Scale(100) * 3 + P:Scale(5) * 4, 120)
     yesBtn:UpdatePixelPerfect()
     noBtn:UpdatePixelPerfect()
     neverBtn:UpdatePixelPerfect()
@@ -744,7 +745,7 @@ local function IsEnemy(unitFlags)
 end
 
 AddCurrentInstance = function()
-    ISC_Data["instances"][currentInstanceID] = {["name"]=currentInstanceName, ["enabled"]=true}
+    ISC_Data["instances"][currentInstanceID] = {["name"] = currentInstanceName, ["enabled"] = true}
     ISC_Data["debuffs"][currentInstanceID] = {}
     ISC_Data["casts"][currentInstanceID] = {}
     ISC_NpcId[currentInstanceID] = {}
@@ -785,42 +786,91 @@ local function GetAuraDesc(unit, id)
     end
 end
 
-local function Save(index, sourceName, spellId, spellName, destGUID, sourceGUID)
-    -- save npcid
-    if not ISC_NpcId[currentInstanceID][sourceName] then
+local function Save(index, sourceName, spellId, spellName, dispelName, destGUID, sourceGUID)
+    local t = ISC_Data[currentInstanceID]
+    -- save enemy-spell ---------------------------------------------------------------------------
+    local enemy = currentEncounterID .. sourceName
+
+    if not t[enemy] then
         -- local _, _, server_id, instance_id, zone_uid, npc_id, spawn_uid = strsplit("-", sourceGUID)
-        ISC_NpcId[currentInstanceID][sourceName] = select(6, strsplit("-", sourceGUID))
+        local id = sourceGUID and select(6, strsplit("-", sourceGUID)) or nil
+        if id then id = tonumber(id) end
+        t[enemy] = {
+            ["id"] = id,
+            ["name"] = sourceName,
+            ["debuffs"] = {},
+            ["casts"] = {},
+        }
     end
 
-    -- save enemy-spell
-    sourceName = currentEncounterID..sourceName
-    if type(ISC_Data[index][currentInstanceID][sourceName]) ~= "table" then
-        ISC_Data[index][currentInstanceID][sourceName] = {}
+    local _, icon, time = GetTheSpellInfo(spellId)
+    local desc, type
+
+    if index == "debuffs" then
+        time = nil
+        type = dispelName
+        if ISC.isRetail then
+            local unit = UnitTokenFromGUID(destGUID)
+            if unit then
+                desc = GetAuraDesc(unit, spellId)
+            end
+        end
     end
-    ISC_Data[index][currentInstanceID][sourceName][spellId] = spellName
+
+    if not t[enemy][index][spellId] then
+        t[enemy][index][spellId] = {
+            ["name"] = spellName,
+            ["icon"] = icon,
+            ["desc"] = desc,
+            ["type"] = type,
+            ["time"] = time,
+        }
+    end
+    -----------------------------------------------------------------------------------------------
 
     if currentEncounterID and currentEncounterName then
         -- save encounter-spell
-        local currentEncounter = "|cff27ffff"..currentEncounterID..currentEncounterName
-        if type(ISC_Data[index][currentInstanceID][currentEncounter]) ~= "table" then
-            ISC_Data[index][currentInstanceID][currentEncounter] = {}
+        local currentEncounter = "|cff27ffff" .. currentEncounterID .. currentEncounterName
+        if not t[currentEncounter] then
+            t[currentEncounter] = {
+                ["name"] = currentEncounterName,
+                ["id"] = tonumber(currentEncounterID),
+                ["npcs"] = {},
+                ["debuffs"] = {},
+                ["casts"] = {},
+            }
         end
-        ISC_Data[index][currentInstanceID][currentEncounter][spellId] = spellName
+
+        if not t[currentEncounter][index][spellId] then
+            t[currentEncounter][index][spellId] = {
+                ["name"] = spellName,
+                ["icon"] = icon,
+                ["desc"] = desc,
+                ["type"] = type,
+                ["time"] = time,
+                ["source"] = sourceName,
+            }
+        end
+
+        t[currentEncounter]["npcs"][sourceName] = true
     else
         -- save mobs-spell
         local mobs = "|cff27ffff* MOBS"
-        if type(ISC_Data[index][currentInstanceID][mobs]) ~= "table" then
-            ISC_Data[index][currentInstanceID][mobs] = {}
+        if not t[mobs] then
+            t[mobs] = {
+                ["debuffs"] = {},
+                ["casts"] = {},
+            }
         end
-        ISC_Data[index][currentInstanceID][mobs][spellId] = spellName
-    end
 
-    -- save aura description
-    if ISC.isRetail and index == "debuffs" and not ISC_AuraDesc[spellId] then
-        local unit = UnitTokenFromGUID(destGUID)
-        if unit then
-            ISC_AuraDesc[spellId] = GetAuraDesc(unit, spellId)
-        end
+        t[mobs][index][spellId] = {
+            ["name"] = spellName,
+            ["icon"] = icon,
+            ["desc"] = desc,
+            ["type"] = type,
+            ["time"] = time,
+            ["source"] = sourceName,
+        }
     end
 end
 
@@ -862,18 +912,17 @@ end
 function collectorFrame:PLAYER_ENTERING_WORLD()
     if IsInInstance() then
         local name, instanceType, difficultyID, difficultyName, maxPlayers, dynamicDifficulty, isDynamic, instanceID, instanceGroupSize, LfgDungeonID = GetInstanceInfo()
-        instanceIDText:SetText("ID: |cffff5500"..instanceID)
-        instanceNameText:SetText("Name: |cffff5500"..name)
+        instanceIDText:SetText("ID: |cffff5500" .. instanceID)
+        instanceNameText:SetText("Name: |cffff5500" .. name)
         currentInstanceName, currentInstanceID = name, instanceID
 
         if ISC_Data["instances"][instanceID] and ISC_Data["instances"][instanceID]["enabled"] then
             statusText:SetText("|cff55ff55TRACKING")
             print("|cff77ff00[ISC] START TRACKING!")
             RegisterEvents()
-
         else
             if not ISC_Data["instances"][instanceID] and not ISC_Ignore[instanceID] and (instanceType == "raid" or instanceType == "party") then
-                dialogText:SetText(dialogTip.."\n|cFFFFD100"..instanceID.."\n"..name)
+                dialogText:SetText(dialogTip .. "\n|cFFFFD100" .. instanceID .. "\n" .. name)
                 dialog:Show()
             end
 
@@ -908,7 +957,7 @@ end
 
 function collectorFrame:ENCOUNTER_START(encounterID, encounterName)
     print("|cff0077ff[ISC] ENCOUNTER_START|r", encounterID, encounterName)
-    currentEncounterID = encounterID.." "
+    currentEncounterID = encounterID .. " "
     currentEncounterName = encounterName
 end
 
@@ -948,8 +997,7 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
 
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
     if (IsEnemy(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
-        if not sourceName then sourceName = "UNKNOWN" end
-        Save("debuffs", sourceName, spellId, spellName, destGUID, sourceGUID)
+        Save("debuffs", sourceName or "UNKNOWN", spellId, spellName, destGUID, sourceGUID)
     end
 end
 

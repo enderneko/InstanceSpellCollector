@@ -4,7 +4,7 @@ local P = ISC.pixelPerfectFuncs
 ISC.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 ISC.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 ISC.isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
- 
+
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 
@@ -17,7 +17,7 @@ function eventFrame:ADDON_LOADED(arg1)
         eventFrame:UnregisterEvent("ADDON_LOADED")
 
         if type(ISC_Config) ~= "table" then ISC_Config = {} end
-       
+
         -- scale
         if type(ISC_Config.scale) ~= "number" then
             local pScale = P:GetPixelPerfectScale()
@@ -37,42 +37,101 @@ function eventFrame:ADDON_LOADED(arg1)
         -- data table
         if type(ISC_Data) ~= "table" then
             ISC_Data = {
-                ["instances"] = {
-                    -- [id] = {name=string, enabled=boolean}
-                },
-                ["debuffs"] = {
-                    -- [instanceId] = {
-                    --     [sourceName] = {spellId=spellname}
-                    -- }
-                },
-                ["casts"] = {
-                    -- [instanceId] = {
-                    --     [sourceName] = {spellId=spellname}
-                    -- }
-                }
-            }
-        end
-
-        -- aura descriptions
-        if type(ISC_AuraDesc) ~= "table" then
-            ISC_AuraDesc = {
-                -- [auraId] = "auraDescription"
-            }
-        end
-
-        -- npc id
-        if type(ISC_NpcId) ~= "table" then
-            ISC_NpcId = {
                 -- [instanceId] = {
-                --     [name] = id
+                --     [instanceName] = (string),
+                --     ["data"] = {
+                --         [encounter/mob] = {
+                --             ["id"] = (number?) encounterId/npcId,
+                --             ["name"] = (string?) encounterName/npcName,
+                --             ["debuffs"] = {
+                --                 [id] = {
+                --                     ["name"] = (string),
+                --                     ["icon"] = (number),
+                --                     ["desc"] = (string),
+                --                     ["type"] = (string?) dispelType,
+                --                     ["source"] = (string?) sourceName,
+                --                 }
+                --             },
+                --             ["casts"] = {
+                --                 [id] = {
+                --                     ["name"] = (string),
+                --                     ["icon"] = (number),
+                --                     ["time"] = (number) castTime,
+                --                     ["source"] = (string?) sourceName,
+                --                 }
+                --             },
+                --         }
+                --     }
                 -- }
             }
         end
 
-        -- fix
-        for id in pairs(ISC_Data["instances"]) do
-            if not ISC_NpcId[id] then ISC_NpcId[id] = {} end
+        -- aura descriptions
+        -- if type(ISC_AuraDesc) ~= "table" then
+        --     ISC_AuraDesc = {
+        --         -- [auraId] = "auraDescription"
+        --     }
+        -- end
+
+        -- npc id
+        -- if type(ISC_NpcId) ~= "table" then
+        --     ISC_NpcId = {
+        --         -- [instanceId] = {
+        --         --     [name] = id
+        --         -- }
+        --     }
+        -- end
+
+        -- revise ---------------------------------------------------
+        -- for id in pairs(ISC_Data["instances"]) do
+        --     if not ISC_NpcId[id] then ISC_NpcId[id] = {} end
+        -- end
+
+        if ISC_AuraDesc and ISC_NpcId then
+            local temp = {}
+
+            for _, index in pairs({"debuffs", "casts"}) do
+                for instanceId, instanceTbl in pairs(ISC_Data[index]) do
+                    if not temp[instanceId] then temp[instanceId] = {} end
+
+                    for source, t in pairs(instanceTbl) do
+                        if not temp[instanceId][source] then
+                            temp[instanceId][source] = {["debuffs"] = {}, ["casts"] = {}}
+                        end
+
+                        -- move spells
+                        for spellId, spellName in pairs(t) do
+                            temp[instanceId][source][index][spellId] = {
+                                ["name"] = spellName,
+                                ["desc"] = ISC_AuraDesc[spellId],
+                            }
+                        end
+
+                        if strfind(source, "^|cff27ffff%d+ ") then
+                            -- add encounter info
+                            temp[instanceId][source]["npcs"] = {}
+                            local id, name = strmatch(source, "^|cff27ffff(%d+) (.+)")
+                            temp[instanceId][source]["id"] = id
+                            temp[instanceId][source]["name"] = name
+                        else
+                            -- move npcId
+                            local name = string.gsub(source, "^* ", "")
+                            name = string.gsub(name, "^%d+ ", "")
+                            if ISC_NpcId[instanceId] and ISC_NpcId[instanceId][name] then
+                                temp[instanceId][source]["id"] = tonumber(ISC_NpcId[instanceId][name])
+                                temp[instanceId][source]["name"] = name
+                            end
+                        end
+                    end
+                end
+            end
+
+            ISC_Data = temp
+            ISC_AuraDesc = nil
+            ISC_NpcId = nil
         end
+
+        -------------------------------------------------------------
 
         -- ignore (don't ask again)
         if type(ISC_Ignore) ~= "table" then
