@@ -1,9 +1,9 @@
 ## Interface: 40400
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r12
+## Version: r13
 ## Author: enderneko
-## SavedVariables: ISC_Config,ISC_Data,ISC_NpcId,ISC_Ignore
+## SavedVariables: ISC_Config,ISC_Data,ISC_Spell,ISC_NpcId,ISC_Ignore
 
 ## X-Curse-Project-ID: 867852
 

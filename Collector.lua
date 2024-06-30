@@ -6,28 +6,43 @@ local UnitIsFriend = UnitIsFriend
 local UnitName = UnitName
 local UnitGUID = UnitGUID
 local IsInInstance = IsInInstance
+local UnitIsPlayer = UnitIsPlayer
 local UnitPlayerOrPetInRaid = UnitPlayerOrPetInRaid
 local UnitPlayerOrPetInParty = UnitPlayerOrPetInParty
+local GetSpellDescription = GetSpellDescription
+local UnitCastingInfo = UnitCastingInfo
+local UnitChannelInfo = UnitChannelInfo
 
 local GetTheSpellInfo
 if C_Spell and C_Spell.GetSpellInfo then
-    GetTheSpellInfo = function(spellid)
-        local info = C_Spell.GetSpellInfo(spellid)
+    GetTheSpellInfo = function(spellId)
+        local info = C_Spell.GetSpellInfo(spellId)
         return info.name, info.iconID or 134400, info.castTime
     end
 else
-    GetTheSpellInfo = function(spellid)
-        local name, _, icon, castTime = GetSpellInfo(spellid)
+    GetTheSpellInfo = function(spellId)
+        local name, _, icon, castTime = GetSpellInfo(spellId)
         return name, icon or 134400, castTime
     end
 end
+
+---------------------------------------------------------------------
+-- debuff type color
+---------------------------------------------------------------------
+local DebuffTypeColor = {
+    -- ["Bleed"] = {1, 0.2, 0.6},
+    ["Disease"] = {0.6, 0.4, 0},
+    ["Poison"] = {0, 0.6, 0},
+    ["Curse"] = {0.6, 0, 1},
+    ["Magic"] = {0.2, 0.6, 1},
+}
 
 ---------------------------------------------------------------------
 -- InstanceSpellCollectorFrame
 ---------------------------------------------------------------------
 local currentInstanceName, currentInstanceID
 local currentEncounterID, currentEncounterName = "* ", nil
-local AddCurrentInstance, LoadInstances, LoadEnemies, LoadDebuffs, LoadCasts, Export
+local AddCurrentInstance, LoadInstances, LoadEnemies, LoadAuras, LoadCasts, Export, AurasToString, CastsToString
 local RegisterEvents, UnregisterEvents
 
 local collectorFrame = CreateFrame("Frame", "InstanceSpellCollectorFrame", UIParent, "BackdropTemplate")
@@ -57,6 +72,11 @@ collectorFrame:SetScript("OnDragStop", function()
     P:PixelPerfectPoint(collectorFrame)
 end)
 
+-- title
+local title = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_TITLE")
+title:SetPoint("TOP", 0, -3)
+title:SetText("Instance Spell Collector")
+title:SetTextColor(1, 0.19, 0.19)
 
 local init
 collectorFrame:SetScript("OnShow", function()
@@ -65,16 +85,11 @@ collectorFrame:SetScript("OnShow", function()
         LoadInstances()
     end
     P:PixelPerfectPoint(collectorFrame)
+    title:SetText("Instance Spell Collector " .. ISC.version)
 end)
 -- collectorFrame:SetScript("OnHide", function()
 --     ISCTooltip:Hide()
 -- end)
-
--- title
-local title = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_TITLE")
-title:SetPoint("TOP", 0, -3)
-title:SetText("Instance Spell Collector")
-title:SetTextColor(1, 0.19, 0.19)
 
 local instanceIDText = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_NORMAL")
 instanceIDText:SetPoint("TOPLEFT", 5, -25)
@@ -134,7 +149,7 @@ local addBtn = ISC:CreateButton(collectorFrame, "Add Current Instance", "red", {
 addBtn:SetPoint("TOPLEFT", 5, -45)
 addBtn:SetScript("OnClick", function()
     if currentInstanceName and currentInstanceID then
-        if not ISC_Data["instances"][currentInstanceID] then
+        if not ISC_Data[currentInstanceID] then
             AddCurrentInstance()
         end
     end
@@ -178,7 +193,7 @@ LoadInstances = function()
     wipe(sotredInstances)
     instanceListFrame.scrollFrame:Reset()
 
-    for id in pairs(ISC_Data["instances"]) do
+    for id in pairs(ISC_Data) do
         tinsert(sotredInstances, id)
     end
     table.sort(sotredInstances)
@@ -195,13 +210,13 @@ LoadInstances = function()
 
         local b = instanceButtons[i]
 
-        if ISC_Data["instances"][id]["enabled"] then
+        if ISC_Data[id]["enabled"] then
             b:GetFontString():SetTextColor(1, 1, 1)
         else
             b:GetFontString():SetTextColor(0.4, 0.4, 0.4)
         end
 
-        b:SetText(id .. " " .. ISC_Data["instances"][id]["name"])
+        b:SetText(id .. " " .. ISC_Data[id]["name"])
 
         if last then
             b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
@@ -218,13 +233,10 @@ LoadInstances = function()
                 if IsControlKeyDown() then -- delete
                     if id == currentInstanceID then
                         statusText:SetText("")
-                        collectorFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-                        if ISC_Data["instances"][id]["enabled"] then print("|cffff7700STOP TRACKING SPELLS!") end
+                        UnregisterEvents()
+                        if ISC_Data[id]["enabled"] then print("|cffff7700STOP TRACKING SPELLS!") end
                     end
-                    ISC_Data["instances"][id] = nil
-                    ISC_Data["debuffs"][id] = nil
-                    ISC_Data["casts"][id] = nil
-                    ISC_NpcId[id] = nil
+                    ISC_Data[id] = nil
                     LoadInstances()
                     if selectedInstance == id then
                         LoadEnemies()
@@ -234,21 +246,21 @@ LoadInstances = function()
                     currentInstanceHighlight:Show()
                     currentInstanceHighlight:SetAllPoints(b)
                     currentInstanceHighlight:SetParent(b)
-                    LoadEnemies(id)
+                    LoadEnemies(ISC_Data[id]["data"])
                 end
-                LoadDebuffs()
+                LoadAuras()
                 LoadCasts()
                 Export()
             elseif button == "RightButton" then -- track/untrack
-                ISC_Data["instances"][id]["enabled"] = not ISC_Data["instances"][id]["enabled"]
-                if ISC_Data["instances"][id]["enabled"] then
+                ISC_Data[id]["enabled"] = not ISC_Data[id]["enabled"]
+                if ISC_Data[id]["enabled"] then
                     b:GetFontString():SetTextColor(1, 1, 1, 1)
                 else
                     b:GetFontString():SetTextColor(0.4, 0.4, 0.4, 1)
                 end
 
                 if id == currentInstanceID then
-                    if ISC_Data["instances"][id]["enabled"] then
+                    if ISC_Data[id]["enabled"] then
                         statusText:SetText("|cff55ff55TRACKING")
                         print("|cff77ff00[ISC] START TRACKING!")
                         RegisterEvents()
@@ -280,23 +292,17 @@ ISC:StylizeFrame(currentEnemyHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedEnemies = {}
 local enemyButtons = {}
-LoadEnemies = function(instanceID)
+LoadEnemies = function(data)
     wipe(sortedEnemies)
     enemyListFrame.scrollFrame:Reset()
     currentEnemyHighlight:Hide()
     currentEnemyHighlight:ClearAllPoints()
 
-    local debuffs = ISC_Data["debuffs"][instanceID]
-    local casts = ISC_Data["casts"][instanceID]
-
-    if not (debuffs and casts) then return end
+    if not data then return end
 
     -- sort
     local enemies = {}
-    for k in pairs(debuffs) do
-        enemies[k] = true
-    end
-    for k in pairs(casts) do
+    for k in pairs(data) do
         enemies[k] = true
     end
     for k in pairs(enemies) do
@@ -323,11 +329,10 @@ LoadEnemies = function(instanceID)
 
             -- tooltip
             enemyButtons[i]:HookScript("OnEnter", function()
-                local name = enemyButtons[i].name
-                if ISC_NpcId[instanceID] and ISC_NpcId[instanceID][name] then
+                if enemyButtons[i].npcId then
                     ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
                     ISCTooltip:SetPoint("TOPLEFT", enemyButtons[i], "TOPRIGHT", 1, 0)
-                    ISCTooltip:AddLine("npcID: " .. "|cffffffff" .. ISC_NpcId[instanceID][name])
+                    ISCTooltip:AddLine("npcID: " .. "|cffffffff" .. enemyButtons[i].npcId)
                     ISCTooltip:Show()
                 end
             end)
@@ -343,8 +348,7 @@ LoadEnemies = function(instanceID)
 
         local b = enemyButtons[i]
         b.enemy = enemy
-        b.name = string.gsub(enemy, "* ", "")
-        b.name = string.gsub(b.name, "^%d+ ", "")
+        b.npcId = data[enemy]["npcId"]
 
         b:SetText(enemy)
 
@@ -360,25 +364,25 @@ LoadEnemies = function(instanceID)
             if IsControlKeyDown() then
                 currentEnemyHighlight:Hide()
                 currentEnemyHighlight:ClearAllPoints()
-                debuffs[enemy] = nil
-                casts[enemy] = nil
-                LoadEnemies(instanceID)
-                LoadDebuffs()
+                data[enemy] = nil
+                LoadEnemies(data)
+                LoadAuras()
                 LoadCasts()
             else
                 currentEnemyHighlight:Show()
                 currentEnemyHighlight:SetAllPoints(b)
                 currentEnemyHighlight:SetParent(b)
-                LoadDebuffs(debuffs[enemy])
-                LoadCasts(casts[enemy])
-            end
+                LoadAuras(data[enemy]["auras"])
+                LoadCasts(data[enemy]["casts"])
 
-            if strfind(enemy, "^|cff") then
-                Export(enemy.."|r", "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
-            elseif ISC_NpcId[instanceID] and ISC_NpcId[instanceID][b.name] then
-                Export(b.name, "npcID: " .. ISC_NpcId[instanceID][b.name], "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
-            else
-                Export(b.name, "\n-- debuffs", debuffs[enemy], "-- casts", casts[enemy])
+                if data[enemy]["encounterId"] then
+                    -- TODO: add NPCs?
+                    Export("eName: " .. data[enemy]["encounterName"], "eId: " .. data[enemy]["encounterId"] .. "\n", AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
+                elseif data[enemy]["npcId"] then
+                    Export("npcName: " .. data[enemy]["npcName"], "npcID: " .. data[enemy]["npcId"] .. "\n", AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
+                else -- UNKNOWN / MOBS
+                    Export(enemy .. "\n", AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
+                end
             end
         end)
     end
@@ -401,19 +405,35 @@ ISC:StylizeFrame(currentDebuffHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedDebuffs = {}
 local debuffButtons = {}
-LoadDebuffs = function(debuffs)
+LoadAuras = function(auras)
     wipe(sortedDebuffs)
     debuffListFrame.scrollFrame:Reset()
     currentDebuffHighlight:Hide()
     currentDebuffHighlight:ClearAllPoints()
     ISCTooltip:Hide()
 
-    if not debuffs then return end
+    if not auras then return end
 
-    for id in pairs(debuffs) do
+    for id in pairs(auras) do
         tinsert(sortedDebuffs, id)
     end
-    table.sort(sortedDebuffs)
+    table.sort(sortedDebuffs, function(a, b)
+        if ISC_Spell[a] and not ISC_Spell[b] then
+            return true
+        end
+        if not ISC_Spell[a] and ISC_Spell[b] then
+            return false
+        end
+        if ISC_Spell[a]["auraType"] ~= ISC_Spell[b]["auraType"] then
+            return ISC_Spell[a]["auraType"] == "buff"
+        end
+        if ISC_Spell[a]["auraDispelType"] ~= ISC_Spell[b]["auraDispelType"] then
+            if ISC_Spell[a]["auraDispelType"] and ISC_Spell[b]["auraDispelType"] then
+                return ISC_Spell[a]["auraDispelType"] < ISC_Spell[b]["auraDispelType"]
+            end
+        end
+        return a < b
+    end)
 
     local last
     for i, id in ipairs(sortedDebuffs) do
@@ -425,7 +445,7 @@ LoadDebuffs = function(debuffs)
                 ISCTooltip:SetOwner(collectorFrame, "ANCHOR_NONE")
                 ISCTooltip:SetPoint("TOPLEFT", debuffButtons[i], "TOPRIGHT", 1, 0)
                 ISCTooltip:SetSpellByID(debuffButtons[i].id)
-                ISCTooltip:SetExtraTip(ISC_AuraDesc[debuffButtons[i].id])
+                ISCTooltip:SetExtraTip(debuffButtons[i].auraDesc)
                 ISCTooltip:Show()
             end)
 
@@ -438,48 +458,65 @@ LoadDebuffs = function(debuffs)
             debuffButtons[i]:Show()
         end
 
-        local b = debuffButtons[i]
-        b.id = id
+        if ISC_Spell[id] and ISC_Spell[id]["icon"] and ISC_Spell[id]["name"] then
+            local b = debuffButtons[i]
+            b.id = id
+            b.auraDesc = ISC_Spell[id]["auraDesc"]
 
-        local icon = select(2, GetTheSpellInfo(id))
-        b:SetText("|T" .. icon .. ":16:16:0:0:16:16|t " .. id .. " " .. debuffs[id])
-
-        if last then
-            b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
-        else
-            b:SetPoint("TOPLEFT", 1, -1)
-        end
-        b:SetPoint("RIGHT", -1, 0)
-        last = b
-
-        b:SetScript("OnClick", function(self, button)
-            if button == "LeftButton" then
-                currentDebuffHighlight:Hide()
-                currentDebuffHighlight:ClearAllPoints()
-                if IsControlKeyDown() then
-                    debuffs[id] = nil
-                    LoadDebuffs(debuffs)
-                else
-                    currentDebuffHighlight:Show()
-                    currentDebuffHighlight:SetAllPoints(b)
-                    currentDebuffHighlight:SetParent(b)
-
-                    local str = id .. ", -- " .. debuffs[id]
-
-                    local spellDesc = GetSpellDescription(id)
-                    if spellDesc then
-                        str = str .. "\n\n" .. spellDesc
-                    end
-
-                    local auraDesc = ISC_AuraDesc[id]
-                    if auraDesc then
-                        str = str .. "\n\n" .. auraDesc
-                    end
-
-                    Export(str)
-                end
+            if ISC_Spell[id]["auraType"] == "debuff" and ISC_Spell[id]["auraDispelType"] and DebuffTypeColor[ISC_Spell[id]["auraDispelType"]] then
+                -- b:GetFontString():SetTextColor(unpack(DebuffTypeColor[ISC_Spell[id]["auraType"]]))
+                b:SetText("|T" .. ISC_Spell[id]["icon"] .. ":16:16:0:0:16:16|t " .. id .. (ISC_Spell[id]["auraStackable"] and "+ " or " ") ..
+                    "|TInterface\\AddOns\\!InstanceSpellCollector\\Media\\" .. ISC_Spell[id]["auraDispelType"] .. ":0|t" .. ISC_Spell[id]["name"])
+            else
+                -- b:GetFontString():SetTextColor(1, 1, 1)
+                b:SetText("|T" .. ISC_Spell[id]["icon"] .. ":16:16:0:0:16:16|t " .. id .. (ISC_Spell[id]["auraStackable"] and "+ " or " ") .. ISC_Spell[id]["name"])
             end
-        end)
+
+            if ISC_Spell[id]["auraType"] == "buff" then
+                b:GetFontString():SetTextColor(0.7, 1, 0.7)
+            else
+                b:GetFontString():SetTextColor(1, 1, 1)
+            end
+
+            if last then
+                b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
+            else
+                b:SetPoint("TOPLEFT", 1, -1)
+            end
+            b:SetPoint("RIGHT", -1, 0)
+            last = b
+
+            b:SetScript("OnClick", function(self, button)
+                if button == "LeftButton" then
+                    currentDebuffHighlight:Hide()
+                    currentDebuffHighlight:ClearAllPoints()
+                    if IsControlKeyDown() then
+                        auras[id] = nil
+                        LoadAuras(auras)
+                    else
+                        currentDebuffHighlight:Show()
+                        currentDebuffHighlight:SetAllPoints(b)
+                        currentDebuffHighlight:SetParent(b)
+
+                        local str = id .. ", -- " .. ISC_Spell[id]["name"]
+
+                        if ISC_Spell[id]["auraStackable"] then
+                            str = str .. "\n" .. "STACKABLE"
+                        end
+
+                        if ISC_Spell[id]["desc"] then
+                            str = str .. "\n\n" .. ISC_Spell[id]["desc"]
+                        end
+
+                        if ISC_Spell[id]["auraDesc"] then
+                            str = str .. "\n\n" .. ISC_Spell[id]["auraDesc"]
+                        end
+
+                        Export(str)
+                    end
+                end
+            end)
+        end
     end
 
     debuffListFrame.scrollFrame:SetContentHeight(20, #sortedDebuffs, -1)
@@ -500,6 +537,11 @@ ISC:StylizeFrame(currentCastHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedCasts = {}
 local castButtons = {}
+local castOrder = {
+    ["cast"] = 1,
+    ["channel"] = 2,
+    ["instant"] = 3,
+}
 LoadCasts = function(casts)
     wipe(sortedCasts)
     castListFrame.scrollFrame:Reset()
@@ -512,7 +554,20 @@ LoadCasts = function(casts)
     for id in pairs(casts) do
         tinsert(sortedCasts, id)
     end
-    table.sort(sortedCasts)
+    table.sort(sortedCasts, function(a, b)
+        if ISC_Spell[a] and not ISC_Spell[b] then
+            return true
+        end
+        if not ISC_Spell[a] and ISC_Spell[b] then
+            return false
+        end
+        if ISC_Spell[a]["castType"] ~= ISC_Spell[b]["castType"] then
+            if ISC_Spell[a]["castType"] and ISC_Spell[a]["castType"] then
+                return castOrder[ISC_Spell[a]["castType"]] < castOrder[ISC_Spell[b]["castType"]]
+            end
+        end
+        return a < b
+    end)
 
     local last
     for i, id in ipairs(sortedCasts) do
@@ -536,41 +591,44 @@ LoadCasts = function(casts)
             castButtons[i]:Show()
         end
 
-        local b = castButtons[i]
-        b.id = id
+        if ISC_Spell[id] and ISC_Spell[id]["icon"] and ISC_Spell[id]["name"] then
+            local b = castButtons[i]
+            b.id = id
 
-        local icon, castTime = select(2, GetTheSpellInfo(id))
-        b:SetText("|T" .. icon .. ":16:16:0:0:16:16|t " .. id .. " " .. casts[id])
+            b:SetText("|T" .. ISC_Spell[id]["icon"] .. ":16:16:0:0:16:16|t " .. id .. " " .. ISC_Spell[id]["name"])
 
-        if castTime == 0 then
-            b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
-        else
-            b:GetFontString():SetTextColor(1, 1, 1)
-        end
-
-        if last then
-            b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
-        else
-            b:SetPoint("TOPLEFT", 1, -1)
-        end
-        b:SetPoint("RIGHT", -1, 0)
-        last = b
-
-        b:SetScript("OnClick", function(self, button)
-            if button == "LeftButton" then
-                currentCastHighlight:Hide()
-                currentCastHighlight:ClearAllPoints()
-                if IsControlKeyDown() then
-                    casts[id] = nil
-                    LoadCasts(casts)
-                else
-                    currentCastHighlight:Show()
-                    currentCastHighlight:SetAllPoints(b)
-                    currentCastHighlight:SetParent(b)
-                    Export(id .. ", -- " .. casts[id] .. "\n\n" .. (GetSpellDescription(id) or ""))
-                end
+            if ISC_Spell[id]["castType"] == "channel" then
+                b:GetFontString():SetTextColor(1, 1, 0.5)
+            elseif ISC_Spell[id]["castType"] == "instant" then
+                b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
+            else
+                b:GetFontString():SetTextColor(1, 1, 1)
             end
-        end)
+
+            if last then
+                b:SetPoint("TOPLEFT", last, "BOTTOMLEFT", 0, 1)
+            else
+                b:SetPoint("TOPLEFT", 1, -1)
+            end
+            b:SetPoint("RIGHT", -1, 0)
+            last = b
+
+            b:SetScript("OnClick", function(self, button)
+                if button == "LeftButton" then
+                    currentCastHighlight:Hide()
+                    currentCastHighlight:ClearAllPoints()
+                    if IsControlKeyDown() then
+                        casts[id] = nil
+                        LoadCasts(casts)
+                    else
+                        currentCastHighlight:Show()
+                        currentCastHighlight:SetAllPoints(b)
+                        currentCastHighlight:SetParent(b)
+                        Export(id .. ", -- " .. ISC_Spell[id]["name"] .. "\n\n" .. (ISC_Spell[id]["desc"] or ""))
+                    end
+                end
+            end)
+        end
     end
 
     castListFrame.scrollFrame:SetContentHeight(20, #sortedCasts, -1)
@@ -601,18 +659,99 @@ exportFrameCloseBtn:SetScript("OnClick", function()
     exportFrame:Hide()
 end)
 
-local function ToString(data)
-    local sorted = {}
+AurasToString = function(data)
     local result = ""
 
     if data then
+        local sorted = {}
         for id in pairs(data) do
             tinsert(sorted, id)
         end
         table.sort(sorted)
 
+        local buffs = {}
+        local debuffs = {}
+
         for _, id in ipairs(sorted) do
-            result = result .. id .. ", -- " .. data[id] .. "\n"
+            if ISC_Spell[id] then
+                if ISC_Spell[id]["auraType"] == "buff" then
+                    tinsert(buffs, id .. ", -- " .. ISC_Spell[id]["name"])
+                else
+                    tinsert(debuffs, id .. ", -- " .. ISC_Spell[id]["name"])
+                end
+            else
+                tinsert(debuffs, id .. ", -- " .. (GetTheSpellInfo(id) or "INVALID"))
+            end
+        end
+
+        if #buffs ~= 0 then
+            result = result .. "-- buffs\n"
+            for _, buff in pairs(buffs) do
+                result = result .. buff .. "\n"
+            end
+        end
+
+        if #debuffs ~= 0 then
+            if result ~= "" then result = result .. "\n" end
+            result = result .. "-- debuffs\n"
+            for _, debuff in pairs(debuffs) do
+                result = result .. debuff .. "\n"
+            end
+        end
+    end
+
+    return result
+end
+
+CastsToString = function(data)
+    local result = ""
+
+    if data then
+        local sorted = {}
+        for id in pairs(data) do
+            tinsert(sorted, id)
+        end
+        table.sort(sorted)
+
+        local casts = {}
+        local channels = {}
+        local instants = {}
+
+        for _, id in ipairs(sorted) do
+            if ISC_Spell[id] then
+                if ISC_Spell[id]["castType"] == "instant" then
+                    tinsert(instants, id .. ", -- " .. ISC_Spell[id]["name"])
+                elseif ISC_Spell[id]["castType"] == "channel" then
+                    tinsert(channels, id .. ", -- " .. ISC_Spell[id]["name"])
+                else
+                    tinsert(casts, id .. ", -- " .. ISC_Spell[id]["name"])
+                end
+            else
+                tinsert(casts, id .. ", -- " .. (GetTheSpellInfo(id) or "INVALID"))
+            end
+        end
+
+        if #casts ~= 0 then
+            result = result .. "-- casts\n"
+            for _, cast in pairs(casts) do
+                result = result .. cast .. "\n"
+            end
+        end
+
+        if #channels ~= 0 then
+            if result ~= "" then result = result .. "\n" end
+            result = result .. "-- channels\n"
+            for _, channel in pairs(channels) do
+                result = result .. channel .. "\n"
+            end
+        end
+
+        if #instants ~= 0 then
+            if result ~= "" then result = result .. "\n" end
+            result = result .. "-- instants\n"
+            for _, instant in pairs(instants) do
+                result = result .. instant .. "\n"
+            end
         end
     end
 
@@ -632,10 +771,8 @@ Export = function(...)
 
     for i = 1, n do
         local data = select(i, ...)
-        if type(data) == "string" then
+        if data ~= "" then
             result = result .. data .. "\n"
-        elseif type(data) == "table" then
-            result = result .. ToString(data) .. "\n"
         end
     end
 
@@ -659,10 +796,10 @@ enemyTip:SetPoint("TOPLEFT", enemyListFrame, "BOTTOMLEFT", 0, -7)
 enemyTip:SetText("[encounterID enemyName]")
 enemyTip:SetTextColor(0.77, 0.77, 0.77)
 
-local debuffTip = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_NORMAL")
-debuffTip:SetPoint("TOPLEFT", debuffListFrame, "BOTTOMLEFT", 0, -7)
-debuffTip:SetText("Debuffs: [spellID spellName]")
-debuffTip:SetTextColor(0.77, 0.77, 0.77)
+local auraTip = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_NORMAL")
+auraTip:SetPoint("TOPLEFT", debuffListFrame, "BOTTOMLEFT", 0, -7)
+auraTip:SetText("Auras: [spellID spellName]")
+auraTip:SetTextColor(0.77, 0.77, 0.77)
 
 local castTip = collectorFrame:CreateFontString(nil, "OVERLAY", "ISC_FONT_NORMAL")
 castTip:SetPoint("TOPLEFT", castListFrame, "BOTTOMLEFT", 0, -7)
@@ -745,10 +882,11 @@ local function IsEnemy(unitFlags)
 end
 
 AddCurrentInstance = function()
-    ISC_Data["instances"][currentInstanceID] = {["name"] = currentInstanceName, ["enabled"] = true}
-    ISC_Data["debuffs"][currentInstanceID] = {}
-    ISC_Data["casts"][currentInstanceID] = {}
-    ISC_NpcId[currentInstanceID] = {}
+    ISC_Data[currentInstanceID] = {
+        ["name"] = currentInstanceName,
+        ["enabled"] = true,
+        ["data"] = {},
+    }
     ISC_Ignore[currentInstanceID] = nil
     LoadInstances()
     collectorFrame:PLAYER_ENTERING_WORLD()
@@ -770,15 +908,9 @@ end
 
 local function GetAuraDesc(unit, id)
     local index = GetAuraIndex(unit, id)
-
     if index then
         local data = C_TooltipInfo_GetUnitDebuff(unit, index)
-
-        queue[data.dataInstanceID] = {
-            unit,
-            id,
-        }
-
+        queue[data.dataInstanceID] = {unit, id}
         if data["lines"] and data["lines"][2] then
             -- print("GET", id, data["lines"][2]["leftText"])
             return data["lines"][2]["leftText"]
@@ -786,91 +918,168 @@ local function GetAuraDesc(unit, id)
     end
 end
 
-local function Save(index, sourceName, spellId, spellName, dispelName, destGUID, sourceGUID)
-    local t = ISC_Data[currentInstanceID]
+local function SaveData(index, sourceGUID, sourceName, spellId)
+    local t = ISC_Data[currentInstanceID]["data"]
+    local npcId = sourceGUID and select(6, strsplit("-", sourceGUID)) or nil
+    if npcId then npcId = tonumber(npcId) end
+
     -- save enemy-spell ---------------------------------------------------------------------------
     local enemy = currentEncounterID .. sourceName
-
     if not t[enemy] then
         -- local _, _, server_id, instance_id, zone_uid, npc_id, spawn_uid = strsplit("-", sourceGUID)
-        local id = sourceGUID and select(6, strsplit("-", sourceGUID)) or nil
-        if id then id = tonumber(id) end
         t[enemy] = {
-            ["id"] = id,
-            ["name"] = sourceName,
-            ["debuffs"] = {},
+            ["npcId"] = npcId,
+            ["npcName"] = sourceName,
+            ["auras"] = {},
             ["casts"] = {},
         }
     end
-
-    local _, icon, time = GetTheSpellInfo(spellId)
-    local desc, type
-
-    if index == "debuffs" then
-        time = nil
-        type = dispelName
-        if ISC.isRetail then
-            local unit = UnitTokenFromGUID(destGUID)
-            if unit then
-                desc = GetAuraDesc(unit, spellId)
-            end
-        end
-    end
-
-    if not t[enemy][index][spellId] then
-        t[enemy][index][spellId] = {
-            ["name"] = spellName,
-            ["icon"] = icon,
-            ["desc"] = desc,
-            ["type"] = type,
-            ["time"] = time,
-        }
-    end
+    t[enemy][index][spellId] = true
     -----------------------------------------------------------------------------------------------
 
     if currentEncounterID and currentEncounterName then
         -- save encounter-spell
-        local currentEncounter = "|cff27ffff" .. currentEncounterID .. currentEncounterName
+        local currentEncounter = "|cff27ffff" .. currentEncounterID .. currentEncounterName .. "|r"
         if not t[currentEncounter] then
             t[currentEncounter] = {
-                ["name"] = currentEncounterName,
-                ["id"] = tonumber(currentEncounterID),
+                ["encounterName"] = currentEncounterName,
+                ["encounterId"] = tonumber(currentEncounterID),
                 ["npcs"] = {},
-                ["debuffs"] = {},
+                ["auras"] = {},
                 ["casts"] = {},
             }
         end
 
-        if not t[currentEncounter][index][spellId] then
-            t[currentEncounter][index][spellId] = {
-                ["name"] = spellName,
-                ["icon"] = icon,
-                ["desc"] = desc,
-                ["type"] = type,
-                ["time"] = time,
-                ["source"] = sourceName,
-            }
+        if npcId then
+            t[currentEncounter]["npcs"][npcId] = sourceName
         end
 
-        t[currentEncounter]["npcs"][sourceName] = true
+        if type(t[currentEncounter][index][spellId]) ~= "table" then t[currentEncounter][index][spellId] = {} end
+        t[currentEncounter][index][spellId][npcId or 0] = sourceName
     else
         -- save mobs-spell
-        local mobs = "|cff27ffff* MOBS"
+        local mobs = "|cff27ffff* MOBS|r"
         if not t[mobs] then
             t[mobs] = {
-                ["debuffs"] = {},
+                ["auras"] = {},
                 ["casts"] = {},
             }
         end
 
-        t[mobs][index][spellId] = {
-            ["name"] = spellName,
-            ["icon"] = icon,
-            ["desc"] = desc,
-            ["type"] = type,
-            ["time"] = time,
-            ["source"] = sourceName,
+        if type(t[mobs][index][spellId]) ~= "table" then t[mobs][index][spellId] = {} end
+        t[mobs][index][spellId][npcId or 0] = sourceName
+    end
+end
+
+local spells = {}
+
+local function UpdateAura(unit, source, spellId, auraDuration, isDebuff, auraDispelType, count)
+    -- print("UpdateAura", unit, source, spellId, auraDuration, isDebuff, auraDispelType)
+
+    if not ISC_Spell[spellId] then
+        ISC_Spell[spellId] = {
+            ["sources"] = {},
+            ["encounters"] = {},
         }
+    end
+
+    ISC_Spell[spellId]["build"] = ISC.build
+
+    local spell = spells[spellId] or Spell:CreateFromSpellID(spellId)
+    spells[spellId] = spell
+
+    if spell:IsSpellDataCached() then
+        ISC_Spell[spellId]["name"] = spell:GetSpellName()
+        ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+        ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
+    else
+        spell:ContinueOnSpellLoad(function()
+            ISC_Spell[spellId]["name"] = spell:GetSpellName()
+            ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+            ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
+        end)
+    end
+
+    if auraDispelType then
+        ISC_Spell[spellId]["auraDispelType"] = auraDispelType
+    end
+    ISC_Spell[spellId]["auraType"] = isDebuff and "debuff" or "buff"
+
+    if ISC.isRetail and unit and not ISC_Spell[spellId]["auraDesc"] then
+        ISC_Spell[spellId]["auraDesc"] = GetAuraDesc(unit, spellId)
+    end
+
+    if auraDuration then
+        ISC_Spell[spellId]["auraDuration"] = auraDuration
+    end
+
+    if count and count > 1 then
+        ISC_Spell[spellId]["auraStackable"] = true
+    end
+
+    if source then
+        local guid = UnitGUID(source)
+        local name = UnitName(source)
+        local id = guid and select(6, strsplit("-", guid)) or nil
+        if id then id = tonumber(id) end
+        if id then
+            ISC_Spell[spellId]["sources"][id] = name
+        end
+    end
+
+    if currentEncounterID and currentEncounterName then
+        ISC_Spell[spellId]["encounters"][tonumber(currentEncounterID)] = currentEncounterName
+    end
+end
+
+local function UpdateCast(source, spellId, castTime, castType)
+    -- print("UpdateCast", source, spellId, castTime, castType)
+
+    if not ISC_Spell[spellId] then
+        ISC_Spell[spellId] = {
+            ["sources"] = {},
+            ["encounters"] = {},
+        }
+    end
+
+    ISC_Spell[spellId]["build"] = ISC.build
+
+    local spell = spells[spellId] or Spell:CreateFromSpellID(spellId)
+    spells[spellId] = spell
+
+    if spell:IsSpellDataCached() then
+        ISC_Spell[spellId]["name"] = spell:GetSpellName()
+        ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+        ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
+    else
+        spell:ContinueOnSpellLoad(function()
+            ISC_Spell[spellId]["name"] = spell:GetSpellName()
+            ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+            ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
+        end)
+    end
+
+    if not (castTime or castType) then
+        if not (ISC_Spell[spellId]["castType"] or ISC_Spell[spellId]["castTime"]) then
+            ISC_Spell[spellId]["castType"] = "instant"
+        end
+    else
+        ISC_Spell[spellId]["castType"] = castType
+        ISC_Spell[spellId]["castTime"] = castTime
+    end
+
+    if source then
+        local guid = UnitGUID(source)
+        local name = UnitName(source)
+        local id = guid and select(6, strsplit("-", guid)) or nil
+        if id then id = tonumber(id) end
+        if id then
+            ISC_Spell[spellId]["sources"][id] = name
+        end
+    end
+
+    if currentEncounterID and currentEncounterName then
+        ISC_Spell[spellId]["encounters"][tonumber(currentEncounterID)] = currentEncounterName
     end
 end
 
@@ -884,13 +1093,11 @@ RegisterEvents = function()
     collectorFrame:RegisterEvent("ENCOUNTER_START")
     collectorFrame:RegisterEvent("ENCOUNTER_END")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-    collectorFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    collectorFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
-    -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
-    -- collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
+    collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    collectorFrame:RegisterEvent("UNIT_AURA")
     if ISC.isRetail then
         collectorFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
-        collectorFrame:RegisterEvent("UNIT_AURA")
     end
 end
 
@@ -899,13 +1106,11 @@ UnregisterEvents = function()
     collectorFrame:UnregisterEvent("ENCOUNTER_START")
     collectorFrame:UnregisterEvent("ENCOUNTER_END")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_FAILED")
-    -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
-    -- collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
+    collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+    collectorFrame:UnregisterEvent("UNIT_AURA")
     if ISC.isRetail then
         collectorFrame:UnregisterEvent("TOOLTIP_DATA_UPDATE")
-        collectorFrame:UnregisterEvent("UNIT_AURA")
     end
 end
 
@@ -916,12 +1121,12 @@ function collectorFrame:PLAYER_ENTERING_WORLD()
         instanceNameText:SetText("Name: |cffff5500" .. name)
         currentInstanceName, currentInstanceID = name, instanceID
 
-        if ISC_Data["instances"][instanceID] and ISC_Data["instances"][instanceID]["enabled"] then
+        if ISC_Data[instanceID] and ISC_Data[instanceID]["enabled"] then
             statusText:SetText("|cff55ff55TRACKING")
             print("|cff77ff00[ISC] START TRACKING!")
             RegisterEvents()
         else
-            if not ISC_Data["instances"][instanceID] and not ISC_Ignore[instanceID] and (instanceType == "raid" or instanceType == "party") then
+            if not ISC_Data[instanceID] and not ISC_Ignore[instanceID] and (instanceType == "raid" or instanceType == "party") then
                 dialogText:SetText(dialogTip .. "\n|cFFFFD100" .. instanceID .. "\n" .. name)
                 dialog:Show()
             end
@@ -949,7 +1154,7 @@ function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
             local data = C_TooltipInfo_GetUnitDebuff(unit, index)
             if data["lines"] and data["lines"][2] then
                 -- print("UPDATE", id, data["lines"][2]["leftText"])
-                ISC_AuraDesc[id] = data["lines"][2]["leftText"]
+                ISC_Spell[id]["auraDesc"] = data["lines"][2]["leftText"]
             end
         end
     end
@@ -968,50 +1173,110 @@ function collectorFrame:ENCOUNTER_END(encounterID, encounterName)
 end
 
 --! CASTS
-function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
+function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId, castTime, castType)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
-    if UnitIsFriend("player", unit) then return end
+    if UnitIsPlayer(unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
 
     local sourceName = UnitName(unit)
-    if not sourceName then return end
-
-    Save("casts", sourceName, spellId, GetTheSpellInfo(spellId), nil, UnitGUID(unit))
+    local sourceGUID = UnitGUID(unit)
+    if sourceName and sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+        SaveData("casts", sourceGUID, sourceName, spellId)
+        UpdateCast(unit, spellId, castTime, castType)
+    end
 end
 
-function collectorFrame:UNIT_SPELLCAST_INTERRUPTED(unit, _, spellId)
-    collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
+function collectorFrame:UNIT_SPELLCAST_START(unit, _, spellId)
+    local _, _, _, startTimeMS, endTimeMS = UnitCastingInfo(unit)
+    if startTimeMS and endTimeMS then
+        collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId, endTimeMS - startTimeMS, "cast")
+    end
 end
 
-function collectorFrame:UNIT_SPELLCAST_FAILED(unit, _, spellId)
-    collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId)
+function collectorFrame:UNIT_SPELLCAST_CHANNEL_START(unit, _, spellId)
+    local _, _, _, startTimeMS, endTimeMS = UnitChannelInfo(unit)
+    if startTimeMS and endTimeMS then
+        collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId, endTimeMS - startTimeMS, "channel")
+    end
 end
 
---! DEBUFFS
+--! AURAS (COMBAT_LOG_EVENT_UNFILTERED)
 function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     local timestamp, event, hideCaster, sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, spellSchool, auraType, amount = ...
-    if event ~= "SPELL_AURA_APPLIED" or auraType ~= "DEBUFF" then return end
+    if event ~= "SPELL_AURA_APPLIED" then return end
 
     if not (currentInstanceName and currentInstanceID and spellId) then return end
     if spellId == 1604 then return end -- 眩晕下坐骑
 
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
-    if (IsEnemy(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
-        Save("debuffs", sourceName or "UNKNOWN", spellId, spellName, destGUID, sourceGUID)
+    if (not IsFriend(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
+        SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
+        UpdateAura(nil, nil, spellId, nil, auraType == "DEBUFF")
     end
 end
 
---! DEBUFFS (UNIT_AURA)
+--! AURAS (UNIT_AURA)
 if ISC.isRetail then
     function collectorFrame:UNIT_AURA(unit, updateInfo)
         if not (currentInstanceName and currentInstanceID and updateInfo) then return end
-        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit)) then return end
+        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or not UnitIsPlayer(unit)) then return end
 
         if updateInfo.addedAuras then
             for _, data in pairs(updateInfo.addedAuras) do
-                if data.isHarmful and data.spellId ~= 1604 and data.sourceUnit and not UnitIsFriend("player", data.sourceUnit) then
-                    local sourceName = UnitName(data.sourceUnit)
-                    Save("debuffs", sourceName or "UNKNOWN", data.spellId, data.name, UnitGUID(unit), UnitGUID(data.sourceUnit))
+                if data.spellId ~= 1604 and data.sourceUnit then
+                    local sourceGUID = UnitGUID(data.sourceUnit)
+                    if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                        local sourceName = UnitName(data.sourceUnit)
+                        SaveData("auras", sourceGUID, sourceName or "UNKNOWN", data.spellId)
+                        UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
+                    end
+                end
+            end
+        end
+
+        if updateInfo.updatedAuraInstanceIDs then
+            for _, id in pairs(updateInfo.updatedAuraInstanceIDs) do
+                local data = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
+                if data.spellId ~= 1604 and data.sourceUnit then
+                    local sourceGUID = UnitGUID(data.sourceUnit)
+                    if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                        UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
+                    end
+                end
+            end
+        end
+    end
+else
+    function collectorFrame:UNIT_AURA(unit)
+        if not (currentInstanceName and currentInstanceID) then return end
+        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or not UnitIsPlayer(unit)) then return end
+
+        for i = 1, 40 do
+            local name, icon, count, dispelType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
+            if not name then
+                break
+            end
+            if spellId ~= 1604 and source then
+                local sourceGUID = UnitGUID(source)
+                if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                    local sourceName = UnitName(source)
+                    SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
+                    UpdateAura(unit, source, spellId, duration, true, dispelType, count)
+                end
+            end
+        end
+
+        for i = 1, 40 do
+            local name, icon, count, dispelType, duration, expirationTime, source, _, _, spellId = UnitBuff(unit, i)
+            if not name then
+                break
+            end
+            if source then
+                local sourceGUID = UnitGUID(source)
+                if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                    local sourceName = UnitName(source)
+                    SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
+                    UpdateAura(unit, source, spellId, duration, false, dispelType, count)
                 end
             end
         end
