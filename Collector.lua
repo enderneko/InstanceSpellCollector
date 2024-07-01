@@ -500,16 +500,44 @@ LoadAuras = function(auras)
 
                         local str = id .. ", -- " .. ISC_Spell[id]["name"]
 
+                        local info = ""
+
+                        if ISC_Spell[id]["auraType"] then
+                            info = info .. "\ntype: " .. ISC_Spell[id]["auraType"]
+                        end
+
+                        if ISC_Spell[id]["auraDispelType"] and ISC_Spell[id]["auraDispelType"] ~= "" then
+                            info = info .. "\ndispelType: " .. ISC_Spell[id]["auraDispelType"]
+                        end
+
+                        if ISC_Spell[id]["auraDuration"] then
+                            info = info .. "\nduration: " .. ISC_Spell[id]["auraDuration"]
+                        end
+
                         if ISC_Spell[id]["auraStackable"] then
-                            str = str .. "\n" .. "STACKABLE"
+                            info = info .. "\nstackable: true"
                         end
 
-                        if ISC_Spell[id]["desc"] then
-                            str = str .. "\n\n" .. ISC_Spell[id]["desc"]
+                        if info ~= "" then
+                            str = str .. "\n" .. info
                         end
 
-                        if ISC_Spell[id]["auraDesc"] then
-                            str = str .. "\n\n" .. ISC_Spell[id]["auraDesc"]
+                        if type(ISC_Spell[id]["sources"]) == "table" then
+                            local source = "\n\nsource:"
+                            for id, name in pairs(ISC_Spell[id]["sources"]) do
+                                source = source .. "\n" .. tostring(id) .. " " .. tostring(name)
+                            end
+                            if source ~= "\n\nsource:" then
+                                str = str .. source
+                            end
+                        end
+
+                        if ISC_Spell[id]["desc"] and ISC_Spell[id]["desc"] ~= "" then
+                            str = str .. "\n\ndescription:\n" .. ISC_Spell[id]["desc"]
+                        end
+
+                        if ISC_Spell[id]["auraDesc"] and ISC_Spell[id]["auraDesc"] ~= "" then
+                            str = str .. "\n\naura description:\n" .. ISC_Spell[id]["auraDesc"]
                         end
 
                         Export(str)
@@ -624,7 +652,30 @@ LoadCasts = function(casts)
                         currentCastHighlight:Show()
                         currentCastHighlight:SetAllPoints(b)
                         currentCastHighlight:SetParent(b)
-                        Export(id .. ", -- " .. ISC_Spell[id]["name"] .. "\n\n" .. (ISC_Spell[id]["desc"] or ""))
+
+                        local str = id .. ", -- " .. ISC_Spell[id]["name"]
+
+                        str = str .. "\n\n" .. "castType: " .. ISC_Spell[id]["castType"]
+
+                        if ISC_Spell[id]["castTime"] then
+                            str = str .. "\n" .. "castTime: " .. (ISC_Spell[id]["castTime"] / 1000)
+                        end
+
+                        if type(ISC_Spell[id]["sources"]) == "table" then
+                            local source = "\n\nsource:"
+                            for id, name in pairs(ISC_Spell[id]["sources"]) do
+                                source = source .. "\n" .. tostring(id) .. " " .. tostring(name)
+                            end
+                            if source ~= "\n\nsource:" then
+                                str = str .. source
+                            end
+                        end
+
+                        if ISC_Spell[id]["desc"] and ISC_Spell[id]["desc"] ~= "" then
+                            str = str .. "\n\n" .. "description:\n" .. ISC_Spell[id]["desc"]
+                        end
+
+                        Export(str)
                     end
                 end
             end)
