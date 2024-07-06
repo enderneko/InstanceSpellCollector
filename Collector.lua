@@ -1260,6 +1260,7 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     if spellId == 1604 then return end -- 眩晕下坐骑
 
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
+    -- https://warcraft.wiki.gg/wiki/UnitFlag
     if (not IsFriend(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
         SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
         UpdateAura(nil, nil, spellId, nil, auraType == "DEBUFF")
@@ -1288,7 +1289,7 @@ if ISC.isRetail then
         if updateInfo.updatedAuraInstanceIDs then
             for _, id in pairs(updateInfo.updatedAuraInstanceIDs) do
                 local data = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
-                if data.spellId ~= 1604 and data.sourceUnit then
+                if data and data.spellId ~= 1604 and data.sourceUnit then
                     local sourceGUID = UnitGUID(data.sourceUnit)
                     if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
                         UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
