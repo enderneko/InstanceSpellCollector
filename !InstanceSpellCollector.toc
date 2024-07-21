@@ -1,7 +1,7 @@
 ## Interface: 100207,110002
 ## Title: |cFFFF3030Instance Spell Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r13
+## Version: r15
 ## Author: enderneko
 ## SavedVariables: ISC_Config,ISC_Data,ISC_Spell,ISC_AuraDesc,ISC_NpcId,ISC_Ignore
 ## AddonCompartmentFunc: ISC_OnAddonCompartmentClick
