@@ -1,5 +1,5 @@
 ## Interface: 11503
-## Title: |cFFFF3030Instance Spell Collector|r
+## Title: |cffff595eInstance|r |cffffca3aSpell|r |cff8ac926Collector|r
 ## Notes: Collect debuffs and enemy casts
 ## Version: r15
 ## Author: enderneko
