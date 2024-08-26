@@ -1271,7 +1271,7 @@ end
 if ISC.isRetail then
     function collectorFrame:UNIT_AURA(unit, updateInfo)
         if not (currentInstanceName and currentInstanceID and updateInfo) then return end
-        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or not UnitIsPlayer(unit)) then return end
+        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
 
         if updateInfo.addedAuras then
             for _, data in pairs(updateInfo.addedAuras) do
@@ -1301,7 +1301,7 @@ if ISC.isRetail then
 else
     function collectorFrame:UNIT_AURA(unit)
         if not (currentInstanceName and currentInstanceID) then return end
-        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or not UnitIsPlayer(unit)) then return end
+        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
 
         for i = 1, 40 do
             local name, icon, count, dispelType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
