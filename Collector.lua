@@ -3,6 +3,8 @@ local P = ISC.pixelPerfectFuncs
 
 local C_TooltipInfo_GetUnitDebuff = C_TooltipInfo and C_TooltipInfo.GetUnitDebuff
 local UnitIsFriend = UnitIsFriend
+local UnitInPartyIsAI = UnitInPartyIsAI or function() end
+local UnitPlayerControlled = UnitPlayerControlled
 local UnitName = UnitName
 local UnitGUID = UnitGUID
 local IsInInstance = IsInInstance
@@ -12,6 +14,8 @@ local UnitPlayerOrPetInParty = UnitPlayerOrPetInParty
 local GetSpellDescription = GetSpellDescription
 local UnitCastingInfo = UnitCastingInfo
 local UnitChannelInfo = UnitChannelInfo
+local CombatLog_Object_IsA = CombatLog_Object_IsA
+local COMBATLOG_FILTER_HOSTILE_UNITS = COMBATLOG_FILTER_HOSTILE_UNITS
 
 local GetTheSpellInfo
 if C_Spell and C_Spell.GetSpellInfo then
@@ -25,6 +29,8 @@ else
         return name, icon or 134400, castTime
     end
 end
+
+local AI_FOLLOWERS = {}
 
 ---------------------------------------------------------------------
 -- debuff type color
@@ -42,7 +48,7 @@ local DebuffTypeColor = {
 ---------------------------------------------------------------------
 local currentInstanceName, currentInstanceID
 local currentEncounterID, currentEncounterName = "* ", nil
-local AddCurrentInstance, LoadInstances, LoadEnemies, LoadAuras, LoadCasts, Export, AurasToString, CastsToString
+local AddCurrentInstance, LoadInstances, LoadEnemies, LoadAuras, LoadCasts, Export, NpcsToString, AurasToString, CastsToString
 local RegisterEvents, UnregisterEvents
 
 local collectorFrame = CreateFrame("Frame", "InstanceSpellCollectorFrame", UIParent, "BackdropTemplate")
@@ -376,8 +382,7 @@ LoadEnemies = function(data)
                 LoadCasts(data[enemy]["casts"])
 
                 if data[enemy]["encounterId"] then
-                    -- TODO: add NPCs?
-                    Export("eName: " .. data[enemy]["encounterName"], "eId: " .. data[enemy]["encounterId"] .. "\n", AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
+                    Export("eName: " .. data[enemy]["encounterName"], "eId: " .. data[enemy]["encounterId"] .. "\n", NpcsToString(data[enemy]["npcs"]), AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
                 elseif data[enemy]["npcId"] then
                     Export("npcName: " .. data[enemy]["npcName"], "npcID: " .. data[enemy]["npcId"] .. "\n", AurasToString(data[enemy]["auras"]), CastsToString(data[enemy]["casts"]))
                 else -- UNKNOWN / MOBS
@@ -709,6 +714,24 @@ exportFrameCloseBtn:SetPoint("BOTTOMRIGHT", exportFrame, "TOPRIGHT", 0, -1)
 exportFrameCloseBtn:SetScript("OnClick", function()
     exportFrame:Hide()
 end)
+
+NpcsToString = function(data)
+    local result = "-- npcs\n"
+
+    if data then
+        local sorted = {}
+        for id in pairs(data) do
+            tinsert(sorted, id)
+        end
+        table.sort(sorted)
+
+        for _, id in ipairs(sorted) do
+            result = result .. id .. "-- " .. data[id] .. "\n"
+        end
+    end
+
+    return result
+end
 
 AurasToString = function(data)
     local result = ""
@@ -1147,8 +1170,10 @@ RegisterEvents = function()
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_START")
     collectorFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
     collectorFrame:RegisterEvent("UNIT_AURA")
+    collectorFrame:RegisterEvent("UNIT_COMBAT")
     if ISC.isRetail then
         collectorFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
+        -- collectorFrame:RegisterEvent("UPDATE_INSTANCE_INFO")
     end
 end
 
@@ -1160,8 +1185,10 @@ UnregisterEvents = function()
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_START")
     collectorFrame:UnregisterEvent("UNIT_SPELLCAST_CHANNEL_START")
     collectorFrame:UnregisterEvent("UNIT_AURA")
+    collectorFrame:UnregisterEvent("UNIT_COMBAT")
     if ISC.isRetail then
         collectorFrame:UnregisterEvent("TOOLTIP_DATA_UPDATE")
+        -- collectorFrame:UnregisterEvent("UPDATE_INSTANCE_INFO")
     end
 end
 
@@ -1195,6 +1222,24 @@ function collectorFrame:PLAYER_ENTERING_WORLD()
     end
 end
 
+-- function collectorFrame:UPDATE_INSTANCE_INFO()
+--     wipe(AI_FOLLOWERS)
+--     -- dungeon AI
+--     if GetDungeonDifficultyID() == 205 then
+--         local unit, guid
+--         for i = 1, 4 do
+--             unit = "party" .. i
+--             if UnitInPartyIsAI(unit) then
+--                 guid = UnitGUID(unit)
+--                 if guid then
+--                     AI_FOLLOWERS[guid] = true
+--                 end
+--             end
+--         end
+--     end
+--     -- TODO: raid AI
+-- end
+
 function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
     if queue[dataInstanceID] then
         local unit, id = queue[dataInstanceID][1], queue[dataInstanceID][2]
@@ -1211,27 +1256,64 @@ function collectorFrame:TOOLTIP_DATA_UPDATE(dataInstanceID)
     end
 end
 
+local handledUnits = {}
+
 function collectorFrame:ENCOUNTER_START(encounterID, encounterName)
     print("|cff0077ff[ISC] ENCOUNTER_START|r", encounterID, encounterName)
+    wipe(handledUnits)
     currentEncounterID = encounterID .. " "
     currentEncounterName = encounterName
 end
 
 function collectorFrame:ENCOUNTER_END(encounterID, encounterName)
     print("|cff0077ff[ISC] ENCOUNTER_END|r", encounterID, encounterName)
+    wipe(handledUnits)
     currentEncounterID = "* "
     currentEncounterName = nil
+end
+
+local function IsValideAuraSource(source)
+    return not (UnitPlayerOrPetInRaid(source) or UnitPlayerOrPetInParty(source) or UnitIsPlayer(source) or UnitPlayerControlled(source))
+end
+
+--! encounter npcs
+function collectorFrame:UNIT_COMBAT(unit)
+    if not (currentEncounterID and currentEncounterName) then return end
+
+    local guid = UnitGUID(unit)
+    if guid and not handledUnits[guid] then
+        handledUnits[guid] = true
+        if IsValideAuraSource(unit) then
+            local npcId = guid and select(6, strsplit("-", guid)) or nil
+            if npcId then npcId = tonumber(npcId) end
+            if npcId then
+                local t = ISC_Data[currentInstanceID]["data"]
+                local currentEncounter = "|cff27ffff" .. currentEncounterID .. currentEncounterName .. "|r"
+
+                if not t[currentEncounter] then
+                    t[currentEncounter] = {
+                        ["encounterName"] = currentEncounterName,
+                        ["encounterId"] = tonumber(currentEncounterID),
+                        ["npcs"] = {},
+                        ["auras"] = {},
+                        ["casts"] = {},
+                    }
+                end
+                t[currentEncounter]["npcs"][npcId] = UnitName(unit)
+            end
+        end
+    end
 end
 
 --! CASTS
 function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId, castTime, castType)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
-    if UnitIsPlayer(unit) then return end
+    if UnitIsPlayer(unit) or UnitInPartyIsAI(unit) or UnitPlayerControlled(unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
 
     local sourceName = UnitName(unit)
     local sourceGUID = UnitGUID(unit)
-    if sourceName and sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+    if sourceName and sourceGUID then
         SaveData("casts", sourceGUID, sourceName, spellId)
         UpdateCast(unit, spellId, castTime, castType)
     end
@@ -1259,9 +1341,13 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
     if spellId == 1604 then return end -- 眩晕下坐骑
 
+    -- if sourceGUID and AI_FOLLOWERS[sourceGUID] then return end
+
     -- !NOTE: some debuffs are SELF-APPLIED but caster == nil
     -- https://warcraft.wiki.gg/wiki/UnitFlag
-    if (not IsFriend(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
+    -- PLAYER_SELF_APPLIED: 1297 (0x511)
+    -- if (not IsFriend(sourceFlags) or (sourceFlags == 1297 and not sourceName)) and IsFriend(destFlags) then
+    if CombatLog_Object_IsA(sourceFlags, COMBATLOG_FILTER_HOSTILE_UNITS) then
         SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
         UpdateAura(nil, nil, spellId, nil, auraType == "DEBUFF")
     end
@@ -1271,13 +1357,13 @@ end
 if ISC.isRetail then
     function collectorFrame:UNIT_AURA(unit, updateInfo)
         if not (currentInstanceName and currentInstanceID and updateInfo) then return end
-        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
+        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
 
         if updateInfo.addedAuras then
             for _, data in pairs(updateInfo.addedAuras) do
                 if data.spellId ~= 1604 and data.sourceUnit then
                     local sourceGUID = UnitGUID(data.sourceUnit)
-                    if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                    if sourceGUID and IsValideAuraSource(data.sourceUnit) then
                         local sourceName = UnitName(data.sourceUnit)
                         SaveData("auras", sourceGUID, sourceName or "UNKNOWN", data.spellId)
                         UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
@@ -1291,7 +1377,7 @@ if ISC.isRetail then
                 local data = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
                 if data and data.spellId ~= 1604 and data.sourceUnit then
                     local sourceGUID = UnitGUID(data.sourceUnit)
-                    if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                    if sourceGUID and IsValideAuraSource(data.sourceUnit) then
                         UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
                     end
                 end
@@ -1301,7 +1387,7 @@ if ISC.isRetail then
 else
     function collectorFrame:UNIT_AURA(unit)
         if not (currentInstanceName and currentInstanceID) then return end
-        if not (unit == "player" or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
+        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
 
         for i = 1, 40 do
             local name, icon, count, dispelType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
@@ -1310,7 +1396,7 @@ else
             end
             if spellId ~= 1604 and source then
                 local sourceGUID = UnitGUID(source)
-                if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                if sourceGUID and IsValideAuraSource(source) then
                     local sourceName = UnitName(source)
                     SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
                     UpdateAura(unit, source, spellId, duration, true, dispelType, count)
@@ -1325,7 +1411,7 @@ else
             end
             if source then
                 local sourceGUID = UnitGUID(source)
-                if sourceGUID and (strfind(sourceGUID, "^Creature") or strfind(sourceGUID, "^Vehicle")) then
+                if sourceGUID and IsValideAuraSource(source) then
                     local sourceName = UnitName(source)
                     SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
                     UpdateAura(unit, source, spellId, duration, false, dispelType, count)
