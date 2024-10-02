@@ -434,11 +434,11 @@ LoadAuras = function(auras, scroll)
         if ISC_Spell[a]["auraType"] ~= ISC_Spell[b]["auraType"] then
             return ISC_Spell[a]["auraType"] == "buff"
         end
-        if ISC_Spell[a]["auraDispelType"] ~= ISC_Spell[b]["auraDispelType"] then
-            if ISC_Spell[a]["auraDispelType"] and ISC_Spell[b]["auraDispelType"] then
-                return ISC_Spell[a]["auraDispelType"] < ISC_Spell[b]["auraDispelType"]
-            end
-        end
+        -- if ISC_Spell[a]["auraDispelType"] ~= ISC_Spell[b]["auraDispelType"] then
+        --     if ISC_Spell[a]["auraDispelType"] and ISC_Spell[b]["auraDispelType"] then
+        --         return ISC_Spell[a]["auraDispelType"] < ISC_Spell[b]["auraDispelType"]
+        --     end
+        -- end
         return a < b
     end)
 
