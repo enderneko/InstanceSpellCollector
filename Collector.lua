@@ -195,7 +195,7 @@ ISC:StylizeFrame(currentInstanceHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 local sotredInstances = {}
 local instanceButtons = {}
 local selectedInstance
-LoadInstances = function()
+LoadInstances = function(scroll)
     wipe(sotredInstances)
     instanceListFrame.scrollFrame:Reset()
 
@@ -243,7 +243,7 @@ LoadInstances = function()
                         if ISC_Data[id]["enabled"] then print("|cffff7700STOP TRACKING SPELLS!") end
                     end
                     ISC_Data[id] = nil
-                    LoadInstances()
+                    LoadInstances(instanceListFrame.scrollFrame:GetVerticalScroll())
                     if selectedInstance == id then
                         LoadEnemies()
                     end
@@ -281,6 +281,7 @@ LoadInstances = function()
     end
 
     instanceListFrame.scrollFrame:SetContentHeight(20, #sotredInstances, -1)
+    instanceListFrame.scrollFrame:VerticalScroll(scroll or 0)
 end
 
 -------------------------------------------------
@@ -298,7 +299,7 @@ ISC:StylizeFrame(currentEnemyHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedEnemies = {}
 local enemyButtons = {}
-LoadEnemies = function(data)
+LoadEnemies = function(data, scorll)
     wipe(sortedEnemies)
     enemyListFrame.scrollFrame:Reset()
     currentEnemyHighlight:Hide()
@@ -371,7 +372,7 @@ LoadEnemies = function(data)
                 currentEnemyHighlight:Hide()
                 currentEnemyHighlight:ClearAllPoints()
                 data[enemy] = nil
-                LoadEnemies(data)
+                LoadEnemies(data, enemyListFrame.scrollFrame:GetVerticalScroll())
                 LoadAuras()
                 LoadCasts()
             else
@@ -393,6 +394,7 @@ LoadEnemies = function(data)
     end
 
     enemyListFrame.scrollFrame:SetContentHeight(20, #sortedEnemies, -1)
+    enemyListFrame.scrollFrame:VerticalScroll(scroll or 0)
 end
 
 -------------------------------------------------
@@ -410,7 +412,7 @@ ISC:StylizeFrame(currentDebuffHighlight, {0, 0, 0, 0}, {0.2, 1, 0.2})
 
 local sortedDebuffs = {}
 local debuffButtons = {}
-LoadAuras = function(auras)
+LoadAuras = function(auras, scroll)
     wipe(sortedDebuffs)
     debuffListFrame.scrollFrame:Reset()
     currentDebuffHighlight:Hide()
@@ -497,7 +499,7 @@ LoadAuras = function(auras)
                     currentDebuffHighlight:ClearAllPoints()
                     if IsControlKeyDown() then
                         auras[id] = nil
-                        LoadAuras(auras)
+                        LoadAuras(auras, debuffListFrame.scrollFrame:GetVerticalScroll())
                     else
                         currentDebuffHighlight:Show()
                         currentDebuffHighlight:SetAllPoints(b)
@@ -553,6 +555,7 @@ LoadAuras = function(auras)
     end
 
     debuffListFrame.scrollFrame:SetContentHeight(20, #sortedDebuffs, -1)
+    debuffListFrame.scrollFrame:VerticalScroll(scroll or 0)
 end
 
 -------------------------------------------------
@@ -575,7 +578,7 @@ local castOrder = {
     ["channel"] = 2,
     ["instant"] = 3,
 }
-LoadCasts = function(casts)
+LoadCasts = function(casts, scorll)
     wipe(sortedCasts)
     castListFrame.scrollFrame:Reset()
     currentCastHighlight:Hide()
@@ -652,7 +655,7 @@ LoadCasts = function(casts)
                     currentCastHighlight:ClearAllPoints()
                     if IsControlKeyDown() then
                         casts[id] = nil
-                        LoadCasts(casts)
+                        LoadCasts(casts, castListFrame.scrollFrame:GetVerticalScroll())
                     else
                         currentCastHighlight:Show()
                         currentCastHighlight:SetAllPoints(b)
@@ -688,6 +691,7 @@ LoadCasts = function(casts)
     end
 
     castListFrame.scrollFrame:SetContentHeight(20, #sortedCasts, -1)
+    castListFrame.scrollFrame:VerticalScroll(scroll or 0)
 end
 
 -------------------------------------------------
