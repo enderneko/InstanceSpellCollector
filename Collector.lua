@@ -1277,7 +1277,7 @@ function collectorFrame:ENCOUNTER_END(encounterID, encounterName)
 end
 
 local function IsValideAuraSource(source)
-    return not (UnitPlayerOrPetInRaid(source) or UnitPlayerOrPetInParty(source) or UnitIsPlayer(source) or UnitPlayerControlled(source))
+    return not (UnitPlayerOrPetInRaid(source) or UnitPlayerOrPetInParty(source) or UnitIsPlayer(source)) -- or UnitPlayerControlled(source))
 end
 
 --! encounter npcs
