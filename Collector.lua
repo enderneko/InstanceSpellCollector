@@ -1276,7 +1276,56 @@ function collectorFrame:ENCOUNTER_END(encounterID, encounterName)
     currentEncounterName = nil
 end
 
-local function IsValideAuraSource(source)
+local AURA_BLACKLIST = {
+    [1604] = true, -- 眩晕下坐骑
+    -- general
+    [160029] = true, -- 正在复活
+    [452831] = true, -- 觅心生命注射器
+    [57724] = true, -- 心满意足
+    [57723] = true, -- 筋疲力尽
+    [390435] = true, -- 筋疲力尽
+    [80354] = true, -- 时空错位
+    [264689] = true, -- 疲倦
+    -- death knight
+    [48743] = true, -- 天灾契约
+    [326809] = true, -- 餍足
+    [123981] = true, -- 永劫不复
+    [116888] = true, -- 炼狱蔽体
+    -- druid
+    [51803] = true, -- 皎月风暴
+    -- evoker
+    [370665] = true, -- 营救
+    -- hunter
+    [382912] = true, -- 精确本能
+    [472710] = true, -- 龟壳庇护
+    -- mage
+    [41425] = true, -- 低温
+    -- monk
+    [124275] = true, -- 轻度醉拳
+    [124274] = true, -- 中度醉拳
+    [124273] = true, -- 重度醉拳
+    -- paladin
+    [387441] = true, -- 苍穹之遗
+    [25771] = true, -- 自律
+    [448005] = true, -- 殉道者之光
+    -- priest
+    [114216] = true, -- 天使壁垒
+    [211319] = true, -- 代偿
+    -- rogue
+    [45181] = true, -- 装死
+    -- warlock
+    [387847] = true, -- 邪甲术
+    [113942] = true, -- 恶魔传送门
+    -- shaman
+    [378277] = true, -- 元素均衡
+    [225080] = true, -- 复生
+}
+
+local function IsValidTarget(target)
+    return UnitPlayerOrPetInRaid(target) or UnitPlayerOrPetInParty(target) or UnitIsPlayer(target)
+end
+
+local function IsValidSource(source)
     return not (UnitPlayerOrPetInRaid(source) or UnitPlayerOrPetInParty(source) or UnitIsPlayer(source)) -- or UnitPlayerControlled(source))
 end
 
@@ -1287,7 +1336,7 @@ function collectorFrame:UNIT_COMBAT(unit)
     local guid = UnitGUID(unit)
     if guid and not handledUnits[guid] then
         handledUnits[guid] = true
-        if IsValideAuraSource(unit) then
+        if IsValidSource(unit) then
             local npcId = guid and select(6, strsplit("-", guid)) or nil
             if npcId then npcId = tonumber(npcId) end
             if npcId then
@@ -1312,7 +1361,7 @@ end
 --! CASTS
 function collectorFrame:UNIT_SPELLCAST_SUCCEEDED(unit, _, spellId, castTime, castType)
     if not (currentInstanceName and currentInstanceID and spellId) then return end
-    if UnitIsPlayer(unit) or UnitInPartyIsAI(unit) or UnitPlayerControlled(unit) then return end
+    if UnitIsPlayer(unit) or UnitInPartyIsAI(unit) or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) then return end
     -- if not (UnitIsEnemy("player", unit) and UnitIsFriend("player", unit.."target")) then return end
 
     local sourceName = UnitName(unit)
@@ -1343,7 +1392,7 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
     if event ~= "SPELL_AURA_APPLIED" then return end
 
     if not (currentInstanceName and currentInstanceID and spellId) then return end
-    if spellId == 1604 then return end -- 眩晕下坐骑
+    if AURA_BLACKLIST[spellId] then return end
 
     -- if sourceGUID and AI_FOLLOWERS[sourceGUID] then return end
 
@@ -1358,30 +1407,63 @@ function collectorFrame:COMBAT_LOG_EVENT_UNFILTERED(...)
 end
 
 --! AURAS (UNIT_AURA)
+local function IsFriendUnit(unit)
+    return UnitIsPlayer(unit) or UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit)
+end
+
+---@param target string always friend unit
+---@return boolean? isValid
+---@return string? sourceGUID
+---@return string sourceName
+local function GetAuraInfo(spellId, isHarmful, source, target)
+    if AURA_BLACKLIST[spellId] then return end
+
+    if not source then
+        return true, nil, "UNKNOWN"
+    end
+
+    if source == target then
+        if IsFriendUnit(source) then
+            -- self applied debuffs
+            return isHarmful, nil, "SELF"
+        else
+            -- enemy to enemy buffs/debuffs
+            return true, UnitGUID(source), UnitName(source) or "UNKNOWN"
+        end
+    else
+        if IsFriendUnit(source) then
+            -- friend to friend debuffs
+            return isHarmful, nil, "PLAYER"
+        else
+            -- enemy to friend buffs/debuffs
+            return true, UnitGUID(source), UnitName(source) or "UNKNOWN"
+        end
+    end
+end
+
 if ISC.isRetail then
+    local GetAuraDataByAuraInstanceID = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
+
     function collectorFrame:UNIT_AURA(unit, updateInfo)
         if not (currentInstanceName and currentInstanceID and updateInfo) then return end
-        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
+        if not IsValidTarget(unit) then return end
 
         if updateInfo.addedAuras then
             for _, data in pairs(updateInfo.addedAuras) do
-                if data.spellId ~= 1604 and data.sourceUnit then
-                    local sourceGUID = UnitGUID(data.sourceUnit)
-                    if sourceGUID and IsValideAuraSource(data.sourceUnit) then
-                        local sourceName = UnitName(data.sourceUnit)
-                        SaveData("auras", sourceGUID, sourceName or "UNKNOWN", data.spellId)
-                        UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
-                    end
+                local isValid, sourceGUID, sourceName = GetAuraInfo(data.spellId, data.isHarmful, data.sourceUnit, unit)
+                if isValid then
+                    SaveData("auras", sourceGUID, sourceName, data.spellId)
+                    UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
                 end
             end
         end
 
         if updateInfo.updatedAuraInstanceIDs then
             for _, id in pairs(updateInfo.updatedAuraInstanceIDs) do
-                local data = C_UnitAuras.GetAuraDataByAuraInstanceID(unit, id)
-                if data and data.spellId ~= 1604 and data.sourceUnit then
-                    local sourceGUID = UnitGUID(data.sourceUnit)
-                    if sourceGUID and IsValideAuraSource(data.sourceUnit) then
+                local data = GetAuraDataByAuraInstanceID(unit, id)
+                if data then
+                    local isValid, sourceGUID, sourceName = GetAuraInfo(data.spellId, data.isHarmful, data.sourceUnit, unit)
+                    if isValid then
                         UpdateAura(unit, data.sourceUnit, data.spellId, data.duration, data.isHarmful, data.dispelName, data.applications)
                     end
                 end
@@ -1389,22 +1471,22 @@ if ISC.isRetail then
         end
     end
 else
+    local UnitBuff, UnitDebuff = UnitBuff, UnitDebuff
+
     function collectorFrame:UNIT_AURA(unit)
         if not (currentInstanceName and currentInstanceID) then return end
-        if not (UnitPlayerOrPetInRaid(unit) or UnitPlayerOrPetInParty(unit) or UnitIsPlayer(unit)) then return end
+        if not IsValidTarget(unit) then return end
 
         for i = 1, 40 do
             local name, icon, count, dispelType, duration, expirationTime, source, _, _, spellId = UnitDebuff(unit, i)
             if not name then
                 break
             end
-            if spellId ~= 1604 and source then
-                local sourceGUID = UnitGUID(source)
-                if sourceGUID and IsValideAuraSource(source) then
-                    local sourceName = UnitName(source)
-                    SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
-                    UpdateAura(unit, source, spellId, duration, true, dispelType, count)
-                end
+
+            local isValid, sourceGUID, sourceName = GetAuraInfo(spellId, true, source, unit)
+            if isValid then
+                SaveData("auras", sourceGUID, sourceName, spellId)
+                UpdateAura(unit, source, spellId, duration, true, dispelType, count)
             end
         end
 
@@ -1413,13 +1495,11 @@ else
             if not name then
                 break
             end
-            if source then
-                local sourceGUID = UnitGUID(source)
-                if sourceGUID and IsValideAuraSource(source) then
-                    local sourceName = UnitName(source)
-                    SaveData("auras", sourceGUID, sourceName or "UNKNOWN", spellId)
-                    UpdateAura(unit, source, spellId, duration, false, dispelType, count)
-                end
+
+            local isValid, sourceGUID, sourceName = GetAuraInfo(spellId, false, source, unit)
+            if isValid then
+                SaveData("auras", sourceGUID, sourceName, spellId)
+                UpdateAura(unit, source, spellId, duration, false, dispelType, count)
             end
         end
     end
