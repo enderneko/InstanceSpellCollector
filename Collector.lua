@@ -1286,13 +1286,19 @@ local AURA_BLACKLIST = {
     [390435] = true, -- 筋疲力尽
     [80354] = true, -- 时空错位
     [264689] = true, -- 疲倦
+    [460536] = true, -- 枯竭星光
+    [313015] = true, -- 新近触发
+    [440389] = true, -- 影缚仪式刻刃
+    [472170] = true, -- 废料场9001型正在充能
+    [206151] = true, -- 挑战者的负担
     -- death knight
     [48743] = true, -- 天灾契约
     [326809] = true, -- 餍足
     [123981] = true, -- 永劫不复
     [116888] = true, -- 炼狱蔽体
+    [374609] = true, -- 抽血
     -- druid
-    [51803] = true, -- 皎月风暴
+    [451803] = true, -- 皎月风暴
     -- evoker
     [370665] = true, -- 营救
     -- hunter
@@ -1300,6 +1306,7 @@ local AURA_BLACKLIST = {
     [472710] = true, -- 龟壳庇护
     -- mage
     [41425] = true, -- 低温
+    [87023] = true, -- 灸灼
     -- monk
     [124275] = true, -- 轻度醉拳
     [124274] = true, -- 中度醉拳
@@ -1308,17 +1315,23 @@ local AURA_BLACKLIST = {
     [387441] = true, -- 苍穹之遗
     [25771] = true, -- 自律
     [448005] = true, -- 殉道者之光
+    [157131] = true, -- 最近刚刚获得圣光的救赎
+    [393879] = true, -- 金色瓦格里的礼物
     -- priest
     [114216] = true, -- 天使壁垒
     [211319] = true, -- 代偿
+    [341291] = true, -- 黑暗弥漫
     -- rogue
     [45181] = true, -- 装死
-    -- warlock
-    [387847] = true, -- 邪甲术
-    [113942] = true, -- 恶魔传送门
     -- shaman
     [378277] = true, -- 元素均衡
     [225080] = true, -- 复生
+    -- warlock
+    [387847] = true, -- 邪甲术
+    [113942] = true, -- 恶魔传送门
+    -- warrior
+    [458386] = true, -- 终有极限
+    [456447] = true, -- 历战老兵
 }
 
 local function IsValidTarget(target)
