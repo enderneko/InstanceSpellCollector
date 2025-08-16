@@ -1291,6 +1291,8 @@ local AURA_BLACKLIST = {
     [440389] = true, -- 影缚仪式刻刃
     [472170] = true, -- 废料场9001型正在充能
     [206151] = true, -- 挑战者的负担
+    [427496] = true, -- Riding Along
+    [1223611] = true, -- Ethereal Exhaustion
     -- death knight
     [48743] = true, -- 天灾契约
     [326809] = true, -- 餍足
@@ -1301,6 +1303,11 @@ local AURA_BLACKLIST = {
     [451803] = true, -- 皎月风暴
     -- evoker
     [370665] = true, -- 营救
+    [414356] = true, -- Stretch Time
+    [363143] = true, -- Light Dilation
+    [363144] = true, -- Medium Dilation
+    [363145] = true, -- Heavy Dilation
+    [404369] = true, -- Empty Hourglass
     -- hunter
     [382912] = true, -- 精确本能
     [472710] = true, -- 龟壳庇护
@@ -1317,6 +1324,7 @@ local AURA_BLACKLIST = {
     [448005] = true, -- 殉道者之光
     [157131] = true, -- 最近刚刚获得圣光的救赎
     [393879] = true, -- 金色瓦格里的礼物
+    [456779] = true, -- Will of the Dawn
     -- priest
     [114216] = true, -- 天使壁垒
     [211319] = true, -- 代偿
@@ -1326,6 +1334,7 @@ local AURA_BLACKLIST = {
     -- shaman
     [378277] = true, -- 元素均衡
     [225080] = true, -- 复生
+    [255234] = true, -- Totemic Revival
     -- warlock
     [387847] = true, -- 邪甲术
     [113942] = true, -- 恶魔传送门
