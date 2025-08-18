@@ -1,7 +1,7 @@
-## Interface: 11506
+## Interface: 11507
 ## Title: |cffff595eInstance|r |cffffca3aSpell|r |cff8ac926Collector|r
 ## Notes: Collect debuffs and enemy casts
-## Version: r18
+## Version: r19
 ## Author: enderneko
 ## SavedVariables: ISC_Config,ISC_Data,ISC_Spell,ISC_NpcId,ISC_Ignore
 

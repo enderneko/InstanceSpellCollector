@@ -91,7 +91,7 @@ collectorFrame:SetScript("OnShow", function()
         LoadInstances()
     end
     P:PixelPerfectPoint(collectorFrame)
-    title:SetText("Instance Spell Collector " .. ISC.version)
+    title:SetText("Instance Spell Collector |cffc0c0c0" .. ISC.version .. "|r")
 end)
 -- collectorFrame:SetScript("OnHide", function()
 --     ISCTooltip:Hide()
