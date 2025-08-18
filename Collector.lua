@@ -636,7 +636,7 @@ LoadCasts = function(casts, scorll)
             if ISC_Spell[id]["castType"] == "channel" then
                 b:GetFontString():SetTextColor(1, 1, 0.5)
             elseif ISC_Spell[id]["castType"] == "instant" then
-                b:GetFontString():SetTextColor(0.5, 0.5, 0.5)
+                b:GetFontString():SetTextColor(0.75, 0.75, 0.75)
             else
                 b:GetFontString():SetTextColor(1, 1, 1)
             end
@@ -1299,6 +1299,7 @@ local AURA_BLACKLIST = {
     [123981] = true, -- 永劫不复
     [116888] = true, -- 炼狱蔽体
     [374609] = true, -- 抽血
+    [97821] = true, -- 虚空之触
     -- druid
     [451803] = true, -- 皎月风暴
     -- evoker
