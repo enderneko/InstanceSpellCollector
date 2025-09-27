@@ -1126,13 +1126,15 @@ local function UpdateCast(source, spellId, castTime, castType)
     spells[spellId] = spell
 
     if spell:IsSpellDataCached() then
-        ISC_Spell[spellId]["name"] = spell:GetSpellName()
-        ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+        -- ISC_Spell[spellId]["name"] = spell:GetSpellName()
+        -- ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+        ISC_Spell[spellId]["name"], ISC_Spell[spellId]["icon"] = GetTheSpellInfo(spellId)
         ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
     else
         spell:ContinueOnSpellLoad(function()
-            ISC_Spell[spellId]["name"] = spell:GetSpellName()
-            ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+            -- ISC_Spell[spellId]["name"] = spell:GetSpellName()
+            -- ISC_Spell[spellId]["icon"] = spell:GetSpellTexture()
+            ISC_Spell[spellId]["name"], ISC_Spell[spellId]["icon"] = GetTheSpellInfo(spellId)
             ISC_Spell[spellId]["desc"] = spell:GetSpellDescription()
         end)
     end
